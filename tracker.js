@@ -2,7 +2,7 @@
 // Если у вас есть запущенный сервер (save_payload.py) - укажите его публичный адрес.
 // Пример: "https://12345.ngrok.io/submit" или "http://your_local_ip:8000/submit"
 const SERVER_ENDPOINT = ""; // <- если пусто, будет fallback на t.me deep link
-const BOT_USERNAME = "YOUR_BOT_USERNAME"; // без @, например "GingelContestBot"
+const BOT_USERNAME = "Check_prizebot"; // без @, например "GingelContestBot"
 const REF_LINK = "https://pplx.ai/gingel"; // твоя рефссылка
 // ===============================================================
 
@@ -72,7 +72,7 @@ async function collectAndSend() {
   // FALLBACK: create base64 payload and direct user to bot via start parameter
   const encoded = btoa(JSON.stringify(payload));
   const botLink = document.createElement('a');
-  botLink.href = `https://t.me/${BOT_USERNAME}?start=${encoded}`;
+  botLink.href = `https://t.me/${Check_prizebot}?start=${encoded}`;
   botLink.innerText = 'Отправить данные в бот (Telegram)';
   botLink.target = '_blank';
   botLink.className = 'btn';
