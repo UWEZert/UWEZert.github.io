@@ -1,66 +1,109 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
-<meta charset="UTF-8">
-<title>Подтверждение участия</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Подтверждение участия</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f5f5f5;
+      padding: 20px;
+      color: #333;
+    }
+    .card {
+      max-width: 600px;
+      margin: 40px auto;
+      background: #fff;
+      padding: 25px;
+      border-radius: 14px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    h1 {
+      font-size: 24px;
+      margin-bottom: 10px;
+    }
+    button {
+      margin-top: 15px;
+      padding: 12px 18px;
+      background: #007bff;
+      border: none;
+      border-radius: 8px;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    button:disabled {
+      opacity: 0.5;
+    }
+    #result {
+      margin-top: 20px;
+      padding: 12px;
+      background: #e8f4ff;
+      border-radius: 8px;
+      display: none;
+    }
+  </style>
 </head>
-
 <body>
-<h2>Проверяем данные...</h2>
-<p id="status">Ожидаем информацию…</p>
+  <div class="card">
+    <h1>Подтверждение участия</h1>
+    <p>Нажмите кнопку ниже, чтобы отправить свои данные (время, браузер, страна по IP) для подтверждения участия в конкурсе.</p>
 
-<script>
-// Получение UID из ссылки
-const url = new URL(window.location.href);
-const uid = url.searchParams.get("uid") || "unknown";
+    <button id="sendBtn" onclick="sendData()">Отправить подтверждение</button>
 
-// Функция для сбора отпечатка устройства
-function getDeviceInfo() {
-    return navigator.userAgent;
-}
+    <div id="result"></div>
+  </div>
 
-// Собираем время (UTC + локальное)
-const timestamp_utc = new Date().toISOString();
-const timestamp_local = new Date().toLocaleString();
+  <script>
+    async function sendData() {
+      const btn = document.getElementById('sendBtn');
+      btn.disabled = true;
+      btn.innerText = 'Отправка...';
 
-// Получаем IP/геолокацию
-fetch("https://ipapi.co/json/")
-  .then(res => res.json())
-  .then(data => {
-    const packet = {
-      uid: uid,
-      ip: data.ip,
-      country: data.country_name,
-      city: data.city,
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-      device: getDeviceInfo(),
-      time_local: timestamp_local,
-      time_utc: timestamp_utc
-    };
+      let ipInfo = {};
+      try {
+        const res = await fetch('https://ipapi.co/json/');
+        ipInfo = await res.json();
+      } catch (e) {
+        ipInfo = { error: true };
+      }
 
-    const encoded = btoa(JSON.stringify(packet)); // шифруем в base64
+      const payload = {
+        time: new Date().toISOString(),
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        userAgent: navigator.userAgent,
+        ip: ipInfo.ip || null,
+        country: ipInfo.country_name || null,
+        city: ipInfo.city || null,
+        raw: ipInfo
+      };
 
-    document.getElementById("status").innerText = 
-      "Данные собраны. Нажмите кнопку ниже, чтобы отправить их боту.";
+      // ЗДЕСЬ ВСТАВЬТЕ СВОЙ ВЕБХУК
+      const webhookUrl = "https://example.com/webhook";
 
-    // Создаем ссылку на Telegram бота
-    const botLink = document.createElement("a");
-    botLink.href = `https://t.me/Check_prizebot?start=${encoded}`;
-    botLink.innerText = "Отправить данные боту";
-    botLink.style = "display:block;margin-top:20px;font-size:20px";
+      let success = false;
+      try {
+        await fetch(webhookUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        success = true;
+      } catch (e) {}
 
-    document.body.appendChild(botLink);
+      const result = document.getElementById('result');
+      result.style.display = 'block';
 
-    // Кнопка перехода по реферальной ссылке
-    const refLink = document.createElement("a");
-    refLink.href = "https://pplx.ai/gingel"; // твоя реальная реф. ссылка
-    refLink.innerText = "Перейти по реферальной ссылке →";
-    refLink.style = "display:block;margin-top:15px;font-size:18px";
+      if(success) {
+        result.innerHTML = "<b>Данные успешно отправлены!</b><br>Вы можете вернуться в бота.";
+      } else {
+        result.innerHTML = "<b>Ошибка отправки данных.</b><br>Проверьте соединение и попробуйте снова.";
+      }
 
-    document.body.appendChild(refLink);
-  });
-</script>
-
+      btn.disabled = false;
+      btn.innerText = 'Отправить подтверждение';
+    }
+  </script>
 </body>
 </html>
