@@ -7,31 +7,51 @@ body {
     overflow: hidden;
 }
 
-/* ——— УМЕНЬШЕННОЕ ВИДЕО ПО ЦЕНТРУ ——— */
+/* ——— ВИДЕО ПО ЦЕНТРУ ——— */
 .video-container {
     position: absolute;
     top: 22%;
     left: 50%;
     transform: translateX(-50%);
-    width: 45vw;        /* регулируй: 35vw = меньше, 55vw = больше */
+    width: 45vw;
     max-width: 720px;
-    z-index: -2;
     pointer-events: none;
+    z-index: -2;
 }
 
 #bgVideo {
     width: 100%;
     height: auto;
-    border-radius: 10px;
+    border-radius: 14px;
     object-fit: cover;
+}
+
+/* ——— ПУЛЬСИРУЮЩАЯ ПОДСВЕТКА ВИДЕО ——— */
+.video-glow {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 110%;
+    height: 110%;
+    transform: translate(-50%, -50%);
+    background: radial-gradient(circle, rgba(110,0,255,0.45), transparent 70%);
+    filter: blur(40px);
+    z-index: -3;
+    animation: glowPulse 4s infinite ease-in-out;
+}
+
+@keyframes glowPulse {
+    0%   { opacity: 0.45; }
+    50%  { opacity: 0.8; }
+    100% { opacity: 0.45; }
 }
 
 /* ——— ЗАТЕМНЕНИЕ ——— */
 .overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0,0,0,0.6);
-    z-index: -3;
+    background: rgba(0,0,0,0.55);
+    z-index: -4;
 }
 
 /* ——— ГЛИТЧ ——— */
@@ -50,13 +70,13 @@ body {
 
 @keyframes glitchMove {
     from { transform: translateY(0); }
-    to { transform: translateY(-100px); }
+    to   { transform: translateY(-120px); }
 }
 
 /* ——— КОНТЕНТ ——— */
 .content {
     position: absolute;
-    top: 65%;
+    top: 66%;
     left: 50%;
     transform: translate(-50%, -50%);
     text-align: center;
@@ -74,23 +94,31 @@ p {
     font-size: 18px;
 }
 
+/* ——— АНГИМИРОВАННАЯ КНОПКА ——— */
 .btn {
     display: inline-block;
     margin-top: 22px;
-    padding: 14px 34px;
-    font-size: 19px;
-    background: linear-gradient(135deg, #7a2bff, #4a0ec9);
-    color: white;
+    padding: 15px 38px;
+    font-size: 20px;
     border-radius: 14px;
     text-decoration: none;
+    color: white;
+    background: linear-gradient(135deg, #7b22ff, #4b00c8);
+    box-shadow: 0 0 25px rgba(125,40,255,0.55);
     cursor: pointer;
-    box-shadow: 0 0 25px rgba(120,40,255,0.55);
     transition: 0.25s;
+    animation: buttonPulse 2.5s infinite ease-in-out;
 }
 
 .btn:hover {
-    transform: scale(1.06);
-    box-shadow: 0 0 35px rgba(140,70,255,0.95);
+    transform: scale(1.07);
+    box-shadow: 0 0 45px rgba(150,70,255,0.9);
+}
+
+@keyframes buttonPulse {
+    0%   { box-shadow: 0 0 18px rgba(125,40,255,0.45); }
+    50%  { box-shadow: 0 0 35px rgba(160,70,255,0.9); }
+    100% { box-shadow: 0 0 18px rgba(125,40,255,0.45); }
 }
 
 .note {
