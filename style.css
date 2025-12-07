@@ -1,104 +1,101 @@
-/* Обнуляем отступы */
 body {
     margin: 0;
     padding: 0;
     background: #000;
-    font-family: "Inter", sans-serif;
     color: #fff;
+    font-family: "Inter", sans-serif;
     overflow: hidden;
 }
 
-/* Видео-фон */
-#bgVideo {
-    position: fixed;
-    top: 50%;
+/* ——— УМЕНЬШЕННОЕ ВИДЕО ПО ЦЕНТРУ ——— */
+.video-container {
+    position: absolute;
+    top: 22%;
     left: 50%;
-    width: auto;
-    height: 100vh;
-    min-width: 100%;
-    min-height: 100%;
-    transform: translate(-50%, -50%);
+    transform: translateX(-50%);
+    width: 45vw;        /* регулируй: 35vw = меньше, 55vw = больше */
+    max-width: 720px;
+    z-index: -2;
+    pointer-events: none;
+}
+
+#bgVideo {
+    width: 100%;
+    height: auto;
+    border-radius: 10px;
     object-fit: cover;
+}
+
+/* ——— ЗАТЕМНЕНИЕ ——— */
+.overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
     z-index: -3;
 }
 
-/* Затемняющий слой */
-.overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0,0,0,0.55); /* регулируем прозрачность */
-    z-index: -2;
-}
-
-/* Лёгкий глитч */
+/* ——— ГЛИТЧ ——— */
 .glitch {
     position: fixed;
     inset: 0;
     background: repeating-linear-gradient(
         transparent 0px,
-        rgba(255, 255, 255, 0.03) 1px,
+        rgba(255,255,255,0.03) 1px,
         transparent 2px
     );
-    mix-blend-mode: overlay;
     animation: glitchMove 3s infinite linear;
+    mix-blend-mode: overlay;
     z-index: -1;
 }
 
 @keyframes glitchMove {
-    0% { transform: translateY(0); }
-    100% { transform: translateY(-100px); }
+    from { transform: translateY(0); }
+    to { transform: translateY(-100px); }
 }
 
-/* Контент */
+/* ——— КОНТЕНТ ——— */
 .content {
     position: absolute;
-    top: 53%;
+    top: 65%;
     left: 50%;
     transform: translate(-50%, -50%);
     text-align: center;
-    max-width: 650px;
     width: 90%;
+    max-width: 600px;
 }
 
-/* Заголовок */
 h1 {
     font-size: 40px;
-    margin-bottom: 12px;
-    text-shadow: 0 0 25px rgba(255,255,255,0.35);
+    text-shadow: 0 0 20px rgba(255,255,255,0.3);
 }
 
-/* Текст */
 p {
-    font-size: 18px;
     opacity: 0.85;
+    font-size: 18px;
 }
 
-/* Кнопка */
 .btn {
     display: inline-block;
-    margin-top: 25px;
-    padding: 15px 35px;
-    background: linear-gradient(135deg, #7d2bff, #4b14c7);
+    margin-top: 22px;
+    padding: 14px 34px;
+    font-size: 19px;
+    background: linear-gradient(135deg, #7a2bff, #4a0ec9);
     color: white;
     border-radius: 14px;
-    font-size: 20px;
     text-decoration: none;
     cursor: pointer;
+    box-shadow: 0 0 25px rgba(120,40,255,0.55);
     transition: 0.25s;
-    box-shadow: 0 0 25px rgba(125,43,255,0.5);
 }
 
 .btn:hover {
-    transform: scale(1.05);
-    box-shadow: 0 0 35px rgba(150,70,255,0.75);
+    transform: scale(1.06);
+    box-shadow: 0 0 35px rgba(140,70,255,0.95);
 }
 
-/* Примечание */
 .note {
-    opacity: 0.65;
-    margin-top: 18px;
+    margin-top: 16px;
+    opacity: 0.6;
     font-size: 15px;
 }
+
