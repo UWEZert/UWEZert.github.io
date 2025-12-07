@@ -1,109 +1,58 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Подтверждение участия</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f5f5f5;
-      padding: 20px;
-      color: #333;
-    }
-    .card {
-      max-width: 600px;
-      margin: 40px auto;
-      background: #fff;
-      padding: 25px;
-      border-radius: 14px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    }
-    h1 {
-      font-size: 24px;
-      margin-bottom: 10px;
-    }
-    button {
-      margin-top: 15px;
-      padding: 12px 18px;
-      background: #007bff;
-      border: none;
-      border-radius: 8px;
-      color: white;
-      font-size: 16px;
-      cursor: pointer;
-    }
-    button:disabled {
-      opacity: 0.5;
-    }
-    #result {
-      margin-top: 20px;
-      padding: 12px;
-      background: #e8f4ff;
-      border-radius: 8px;
-      display: none;
-    }
-  </style>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Перепроверка участия</title>
+    <link rel="stylesheet" href="style.css" />
 </head>
+
 <body>
-  <div class="card">
-    <h1>Подтверждение участия</h1>
-    <p>Нажмите кнопку ниже, чтобы отправить свои данные (время, браузер, страна по IP) для подтверждения участия в конкурсе.</p>
+    <div class="video-bg">
+        <img src="background.gif" class="bg-gif" id="bgGif" />
+    </div>
 
-    <button id="sendBtn" onclick="sendData()">Отправить подтверждение</button>
+    <div class="content">
+        <h1>Подтверждение участия</h1>
+        <p>
+            Пожалуйста, нажмите кнопку ниже, чтобы подтвердить участие в конкурсе.
+        </p>
 
-    <div id="result"></div>
-  </div>
+        <a class="btn" id="confirmBtn">
+            Подтвердить участие
+        </a>
 
-  <script>
-    async function sendData() {
-      const btn = document.getElementById('sendBtn');
-      btn.disabled = true;
-      btn.innerText = 'Отправка...';
+        <p class="note">
+            После подтверждения бот автоматически получит ваши данные.
+        </p>
+    </div>
 
-      let ipInfo = {};
-      try {
-        const res = await fetch('https://ipapi.co/json/');
-        ipInfo = await res.json();
-      } catch (e) {
-        ipInfo = { error: true };
-      }
+    <script>
+        // Уникальная часть ссылки — здесь будет Base64 payload
+        function generatePayload() {
+            const payload = {
+                uid: crypto.randomUUID(),
+                timestamp: new Date().toISOString(),
+                tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                userAgent: navigator.userAgent,
+            };
 
-      const payload = {
-        time: new Date().toISOString(),
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        userAgent: navigator.userAgent,
-        ip: ipInfo.ip || null,
-        country: ipInfo.country_name || null,
-        city: ipInfo.city || null,
-        raw: ipInfo
-      };
+            return btoa(JSON.stringify(payload));
+        }
 
-      // ЗДЕСЬ ВСТАВЬТЕ СВОЙ ВЕБХУК
-      const webhookUrl = "https://example.com/webhook";
-
-      let success = false;
-      try {
-        await fetch(webhookUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
+        document.getElementById("confirmBtn").addEventListener("click", () => {
+            const encoded = generatePayload();
+            window.location.href = "https://t.me/ВАШ_БОТ?start=" + encoded;
         });
-        success = true;
-      } catch (e) {}
 
-      const result = document.getElementById('result');
-      result.style.display = 'block';
+        // Остановить GIF после одного проигрывания
+        const gif = document.getElementById("bgGif");
+        gif.addEventListener("load", () => {
+            setTimeout(() => {
+                gif.style.animationPlayState = "paused";
+            }, 3500); // изменить под длину GIF
+        });
+    </script>
 
-      if(success) {
-        result.innerHTML = "<b>Данные успешно отправлены!</b><br>Вы можете вернуться в бота.";
-      } else {
-        result.innerHTML = "<b>Ошибка отправки данных.</b><br>Проверьте соединение и попробуйте снова.";
-      }
-
-      btn.disabled = false;
-      btn.innerText = 'Отправить подтверждение';
-    }
-  </script>
 </body>
 </html>
