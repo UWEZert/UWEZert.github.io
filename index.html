@@ -1,26 +1,27 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Перепроверка участия</title>
-    <link rel="stylesheet" href="style.css" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Подтверждение участия</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
-    <div class="video-bg">
-        <img src="background.gif" class="bg-gif" id="bgGif" />
+    <!-- ФОН + ЭФФЕКТ ГЛИТЧА -->
+    <div class="glitch-bg"></div>
+
+    <!-- GIF (уменьшенная, чёткая, по центру) -->
+    <div class="gif-container">
+        <img src="background.gif" id="bgGif" class="gif" />
     </div>
 
+    <!-- Контент -->
     <div class="content">
         <h1>Подтверждение участия</h1>
-        <p>
-            Пожалуйста, нажмите кнопку ниже, чтобы подтвердить участие в конкурсе.
-        </p>
+        <p>Нажмите кнопку ниже, чтобы отправить подтверждение.</p>
 
-        <a class="btn" id="confirmBtn">
-            Подтвердить участие
-        </a>
+        <a class="btn" id="confirmBtn">Подтвердить участие</a>
 
         <p class="note">
             После подтверждения бот автоматически получит ваши данные.
@@ -28,31 +29,28 @@
     </div>
 
     <script>
-        // Уникальная часть ссылки — здесь будет Base64 payload
         function generatePayload() {
             const payload = {
                 uid: crypto.randomUUID(),
                 timestamp: new Date().toISOString(),
                 tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
-                userAgent: navigator.userAgent,
+                userAgent: navigator.userAgent
             };
-
             return btoa(JSON.stringify(payload));
         }
 
-        document.getElementById("confirmBtn").addEventListener("click", () => {
+        document.getElementById("confirmBtn").onclick = () => {
             const encoded = generatePayload();
             window.location.href = "https://t.me/ВАШ_БОТ?start=" + encoded;
-        });
+        };
 
-        // Остановить GIF после одного проигрывания
+        // Остановка GIF после проигрывания
         const gif = document.getElementById("bgGif");
-        gif.addEventListener("load", () => {
+        gif.onload = () => {
             setTimeout(() => {
                 gif.style.animationPlayState = "paused";
-            }, 3500); // изменить под длину GIF
-        });
+            }, 3500); // подгоняется под длину GIF
+        };
     </script>
-
 </body>
 </html>
