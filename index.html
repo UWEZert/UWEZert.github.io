@@ -8,18 +8,24 @@
 </head>
 
 <body>
-    <!-- ФОН + ЭФФЕКТ ГЛИТЧА -->
-    <div class="glitch-bg"></div>
 
-    <!-- GIF (уменьшенная, чёткая, по центру) -->
-    <div class="gif-container">
-        <img src="background.gif" id="bgGif" class="gif" />
-    </div>
+    <!-- ВИДЕО-ФОН -->
+    <video autoplay muted playsinline id="bgVideo">
+        <source src="background.mp4" type="video/mp4">
+    </video>
 
-    <!-- Контент -->
+    <!-- ЗАТЕМНЯЮЩИЙ СЛОЙ -->
+    <div class="overlay"></div>
+
+    <!-- ГЛИТЧ-ФОН -->
+    <div class="glitch"></div>
+
+    <!-- КОНТЕНТ -->
     <div class="content">
         <h1>Подтверждение участия</h1>
-        <p>Нажмите кнопку ниже, чтобы отправить подтверждение.</p>
+        <p>
+            Нажмите кнопку ниже, чтобы подтвердить участие в конкурсе.
+        </p>
 
         <a class="btn" id="confirmBtn">Подтвердить участие</a>
 
@@ -29,6 +35,7 @@
     </div>
 
     <script>
+        // Генерация уникального payload
         function generatePayload() {
             const payload = {
                 uid: crypto.randomUUID(),
@@ -39,18 +46,18 @@
             return btoa(JSON.stringify(payload));
         }
 
+        // Переход в бота
         document.getElementById("confirmBtn").onclick = () => {
             const encoded = generatePayload();
             window.location.href = "https://t.me/ВАШ_БОТ?start=" + encoded;
         };
 
-        // Остановка GIF после проигрывания
-        const gif = document.getElementById("bgGif");
-        gif.onload = () => {
-            setTimeout(() => {
-                gif.style.animationPlayState = "paused";
-            }, 3500); // подгоняется под длину GIF
+        // Остановить видео после одного проигрывания
+        const vid = document.getElementById("bgVideo");
+        vid.onended = () => {
+            vid.pause();
         };
     </script>
+
 </body>
 </html>
