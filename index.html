@@ -9,27 +9,28 @@
 
 <body>
 
-    <!-- НЕ НА ВЕСЬ ЭКРАН — уменьшенное видео -->
+    <!-- ВИДЕО ПО ЦЕНТРУ (ЗАЦИКЛЕНОЕ) -->
     <div class="video-container">
-        <video autoplay muted playsinline id="bgVideo">
+        <video autoplay muted playsinline loop id="bgVideo">
             <source src="background.mp4" type="video/mp4">
         </video>
+
+        <!-- ПОДСВЕТКА ПОЗАДИ ВИДЕО -->
+        <div class="video-glow"></div>
     </div>
 
-    <!-- Глитч + затемнение -->
+    <!-- ГЛИТЧ + ЗАТЕМНЕНИЕ -->
     <div class="overlay"></div>
     <div class="glitch"></div>
 
-    <!-- Контент -->
+    <!-- КОНТЕНТ -->
     <div class="content">
         <h1>Подтверждение участия</h1>
         <p>Нажмите кнопку ниже, чтобы подтвердить участие в конкурсе.</p>
 
         <a class="btn" id="confirmBtn">Подтвердить участие</a>
 
-        <p class="note">
-            После подтверждения бот автоматически получит ваши данные.
-        </p>
+        <p class="note">После подтверждения бот автоматически получит ваши данные.</p>
     </div>
 
     <script>
@@ -47,10 +48,6 @@
             const encoded = generatePayload();
             window.location.href = "https://t.me/ВАШ_БОТ?start=" + encoded;
         };
-
-        // Останавливаем видео после одного цикла
-        const vid = document.getElementById("bgVideo");
-        vid.onended = () => vid.pause();
     </script>
 
 </body>
