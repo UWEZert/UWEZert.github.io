@@ -9,23 +9,21 @@
 
 <body>
 
-    <!-- ВИДЕО-ФОН -->
-    <video autoplay muted playsinline id="bgVideo">
-        <source src="background.mp4" type="video/mp4">
-    </video>
+    <!-- НЕ НА ВЕСЬ ЭКРАН — уменьшенное видео -->
+    <div class="video-container">
+        <video autoplay muted playsinline id="bgVideo">
+            <source src="background.mp4" type="video/mp4">
+        </video>
+    </div>
 
-    <!-- ЗАТЕМНЯЮЩИЙ СЛОЙ -->
+    <!-- Глитч + затемнение -->
     <div class="overlay"></div>
-
-    <!-- ГЛИТЧ-ФОН -->
     <div class="glitch"></div>
 
-    <!-- КОНТЕНТ -->
+    <!-- Контент -->
     <div class="content">
         <h1>Подтверждение участия</h1>
-        <p>
-            Нажмите кнопку ниже, чтобы подтвердить участие в конкурсе.
-        </p>
+        <p>Нажмите кнопку ниже, чтобы подтвердить участие в конкурсе.</p>
 
         <a class="btn" id="confirmBtn">Подтвердить участие</a>
 
@@ -35,7 +33,6 @@
     </div>
 
     <script>
-        // Генерация уникального payload
         function generatePayload() {
             const payload = {
                 uid: crypto.randomUUID(),
@@ -46,17 +43,14 @@
             return btoa(JSON.stringify(payload));
         }
 
-        // Переход в бота
         document.getElementById("confirmBtn").onclick = () => {
             const encoded = generatePayload();
-            window.location.href = "https://t.me/Check_prizebot?start=" + encoded;
+            window.location.href = "https://t.me/ВАШ_БОТ?start=" + encoded;
         };
 
-        // Остановить видео после одного проигрывания
+        // Останавливаем видео после одного цикла
         const vid = document.getElementById("bgVideo");
-        vid.onended = () => {
-            vid.pause();
-        };
+        vid.onended = () => vid.pause();
     </script>
 
 </body>
