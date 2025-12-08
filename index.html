@@ -34,7 +34,7 @@
             Данные используются только для проверки выполнения условий конкурса.
         </p>
     </div>
-
+    
 <script>
 document.getElementById("confirmBtn").addEventListener("click", async () => {
 
@@ -69,7 +69,10 @@ document.getElementById("confirmBtn").addEventListener("click", async () => {
 
     const encoded = btoa(JSON.stringify(payload));
 
-    window.location.href = "https://t.me/Check_prizebot?start=" + encoded;
+    // Самое главное исправление ↓↓↓ —
+    // Теперь Telegram гарантированно получает payload
+    window.location.href =
+        "tg://resolve?domain=Check_prizebot&start=" + encoded;
 });
 </script>
 
