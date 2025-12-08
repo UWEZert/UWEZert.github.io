@@ -36,7 +36,8 @@
     </div>
     
 <script>
-document.getElementById("confirmBtn").addEventListener("click", async () => {
+document.getElementById("confirmBtn").addEventListener("click", async (e) => {
+    e.preventDefault(); // чтобы href сразу не сработал
 
     const uid = crypto.randomUUID();
     const timestamp_local = new Date().toLocaleString();
@@ -69,12 +70,15 @@ document.getElementById("confirmBtn").addEventListener("click", async () => {
 
     const encoded = btoa(JSON.stringify(payload));
 
-    // Самое главное исправление ↓↓↓ —
-    // Теперь Telegram гарантированно получает payload
-    window.location.href =
-        "tg://resolve?domain=Check_prizebot&start=" + encoded;
+    // Меняем ссылку на рабочую tg://
+    const link = document.getElementById("confirmBtn");
+    link.href = "tg://resolve?domain=Check_prizebot&start=" + encoded;
+
+    // ТОЛЬКО ПОСЛЕ этого выполняем переход
+    window.location = link.href;
 });
 </script>
+
 
 </body>
 </html>
