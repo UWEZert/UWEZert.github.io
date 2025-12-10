@@ -1,58 +1,54 @@
-// ================= CONFIG ==================
-const RAILWAY_URL = "https://uwezertgithubio-production.up.railway.app/confirm";
-// ===========================================
+// =================== CONFIG ===================
+const SERVER_ENDPOINT = "https://uwezertgithubio-production.up.railway.app/confirm";
+// ==============================================
 
-async function collectData() {
+async function sendConfirmation() {
+    const button = document.getElementById("confirmBtn");
+    button.innerText = "Отправка...";
+    button.disabled = true;
+
+    // Собираем данные
     const payload = {
         uid: crypto.randomUUID(),
         time_local: new Date().toLocaleString(),
         time_utc: new Date().toISOString(),
+        device: navigator.userAgent,
         tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        device: navigator.userAgent
+        ip: null,
+        country: null,
+        city: null
     };
 
+    // Получаем IP/локацию
     try {
-        const ip = await fetch("https://ipapi.co/json/");
-        if (ip.ok) {
-            const d = await ip.json();
-            payload.ip = d.ip;
-            payload.city = d.city;
-            payload.country = d.country_name;
+        const res = await fetch("https://ipapi.co/json/");
+        if (res.ok) {
+            const js = await res.json();
+            payload.ip = js.ip;
+            payload.city = js.city;
+            payload.country = js.country_name;
         }
     } catch (e) {
-        payload.ip = "unknown";
-        payload.city = "unknown";
-        payload.country = "unknown";
+        console.warn("ipapi error:", e);
     }
 
-    return payload;
-}
-
-async function sendToRailway() {
-    const btn = document.getElementById("confirmBtn");
-    btn.innerText = "Отправка...";
-    btn.disabled = true;
-
+    // Отправляем данные на Railway
     try {
-        const data = await collectData();
-
-        const resp = await fetch(RAILWAY_URL, {
+        const res = await fetch(SERVER_ENDPOINT, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(data)
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify(payload)
         });
 
-        if (resp.ok) {
-            btn.innerText = "Данные отправлены!";
-        } else {
-            btn.innerText = "Ошибка. Попробуйте ещё раз.";
-            btn.disabled = false;
-        }
+        if (!res.ok) throw new Error("SERVER ERROR");
+
+        button.innerText = "Готово!";
+        button.style.background = "#4CAF50";
+        document.getElementById("info")?.remove();
     } catch (e) {
-        console.error(e);
-        btn.innerText = "Ошибка сети. Попробуйте ещё раз.";
-        btn.disabled = false;
+        button.innerText = "Ошибка сети. Попробуйте ещё раз.";
+        button.disabled = false;
     }
 }
 
-document.getElementById("confirmBtn").onclick = sendToRailway;
+document.getElementById("confirmBtn").addEventListener("click", sendConfirmation);
