@@ -8,21 +8,22 @@ from dotenv import load_dotenv
 load_dotenv()
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_ID  = os.getenv("ADMIN_ID")
+ADMIN_ID = os.getenv("ADMIN_ID")
 
 bot_url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 
 app = FastAPI()
 
-# Разрешаем GitHub Pages обращаться к твоему backend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://uwezert.github.io"],
-    allow_methods=["GET", "POST"],
+    allow_origins=[
+        "https://uwezert.github.io",
+        "https://uwezert.github.io/"
+    ],
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
 
-# ----- Модель данных -----
 class Payload(BaseModel):
     uid: str
     ip: str | None = None
@@ -33,12 +34,14 @@ class Payload(BaseModel):
     device: str | None = None
     tz: str | None = None
 
-# ----- Новый корректный GET handler -----
 @app.get("/confirm")
 async def confirm_get():
     return {"status": "ok", "message": "GET allowed — server online"}
 
-# ----- Основной POST handler -----
+@app.options("/confirm")
+async def confirm_options():
+    return {"status": "ok", "message": "OPTIONS allowed"}
+
 @app.post("/confirm")
 async def confirm(data: Payload):
 
@@ -54,7 +57,6 @@ async def confirm(data: Payload):
         f"TZ: {data.tz}"
     )
 
-    # отправляем уведомление админу
     requests.post(bot_url, data={
         "chat_id": ADMIN_ID,
         "text": msg
