@@ -1,65 +1,65 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+import httpx
 import os
-import requests
-from dotenv import load_dotenv
-
-load_dotenv()
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_ID = os.getenv("ADMIN_ID")
-
-bot_url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+ADMIN_ID = os.getenv("ADMIN_ID")  # твой Telegram ID
+BOT_API = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 
 app = FastAPI()
 
+# --------- FIX: Разрешаем CORS + OPTIONS ----------
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://uwezert.github.io",
-        "https://uwezert.github.io/"
-    ],
-    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_origins=["*"],
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
-class Payload(BaseModel):
+# --------- Модель данных ----------
+class ConfirmPayload(BaseModel):
     uid: str
+    time_local: str
+    time_utc: str
+    device: str
+    tz: str
     ip: str | None = None
-    city: str | None = None
     country: str | None = None
-    time_local: str | None = None
-    time_utc: str | None = None
-    device: str | None = None
-    tz: str | None = None
+    city: str | None = None
 
-@app.get("/confirm")
-async def confirm_get():
-    return {"status": "ok", "message": "GET allowed — server online"}
-
+# --------- OPTIONS Хэндлер (ОБЯЗАТЕЛЬНО) ----------
 @app.options("/confirm")
-async def confirm_options():
-    return {"status": "ok", "message": "OPTIONS allowed"}
+async def options_handler():
+    return {"status": "ok"}
 
+# --------- POST /confirm ----------
 @app.post("/confirm")
-async def confirm(data: Payload):
+async def confirm(data: ConfirmPayload):
 
-    msg = (
-        "🔥 Новое подтверждение!\n\n"
-        f"UID: {data.uid}\n"
-        f"IP: {data.ip}\n"
-        f"Город: {data.city}\n"
-        f"Страна: {data.country}\n"
-        f"Local time: {data.time_local}\n"
-        f"UTC: {data.time_utc}\n"
-        f"Устройство: {data.device}\n"
-        f"TZ: {data.tz}"
+    text = (
+        "📩 <b>Получено подтверждение с сайта</b>\n\n"
+        f"UID: <code>{data.uid}</code>\n"
+        f"🌍 IP: {data.ip}\n"
+        f"🏙 Город: {data.city}\n"
+        f"🌐 Страна: {data.country}\n\n"
+        f"🕒 Local: {data.time_local}\n"
+        f"🕒 UTC: {data.time_utc}\n"
+        f"💻 Device: {data.device}\n"
+        f"⏱ TZ: {data.tz}"
     )
 
-    requests.post(bot_url, data={
-        "chat_id": ADMIN_ID,
-        "text": msg
-    })
+    # отправляем админу
+    async with httpx.AsyncClient() as client:
+        await client.post(
+            BOT_API,
+            json={"chat_id": ADMIN_ID, "text": text, "parse_mode": "HTML"}
+        )
 
-    return {"status": "ok"}
+    return {"ok": True}
+
+# --------- healthcheck ----------
+@app.get("/")
+async def root():
+    return {"status": "running"}
