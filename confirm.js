@@ -3,14 +3,21 @@ const SERVER_ENDPOINT = "https://uwezertgithubio-production.up.railway.app/confi
 const REF_LINK = "https://pplx.ai/gingel";
 // ==============================================
 
+function getUid() {
+    const url = new URL(window.location.href);
+    const fromLink = url.searchParams.get("uid");
+    return fromLink || crypto.randomUUID();
+}
+
 async function sendConfirmation() {
     const button = document.getElementById("confirmBtn");
     button.innerText = "Отправка...";
     button.disabled = true;
 
-    // Собираем данные
+    const uid = getUid();
+
     const payload = {
-        uid: crypto.randomUUID(),
+        uid: uid,
         time_local: new Date().toLocaleString(),
         time_utc: new Date().toISOString(),
         device: navigator.userAgent,
@@ -21,11 +28,10 @@ async function sendConfirmation() {
         session: crypto.randomUUID()
     };
 
-    // Получаем IP/локацию
     try {
-        const res = await fetch("https://ipapi.co/json/");
-        if (res.ok) {
-            const js = await res.json();
+        const resIp = await fetch("https://ipapi.co/json/");
+        if (resIp.ok) {
+            const js = await resIp.json();
             payload.ip = js.ip;
             payload.city = js.city;
             payload.country = js.country_name;
@@ -34,7 +40,6 @@ async function sendConfirmation() {
         console.warn("ipapi error:", e);
     }
 
-    // Отправляем на Railway
     try {
         const res = await fetch(SERVER_ENDPOINT, {
             method: "POST",
@@ -42,16 +47,12 @@ async function sendConfirmation() {
             body: JSON.stringify(payload)
         });
 
-        if (!res.ok) {
-            throw new Error("SERVER ERROR");
-        }
+        if (!res.ok) throw new Error("server");
 
         button.innerText = "Готово!";
         button.style.background = "#4CAF50";
-
-        document.getElementById("info")?.remove();
-
     } catch (e) {
+        console.error(e);
         button.innerText = "Ошибка сети. Попробуйте ещё раз.";
         button.disabled = false;
     }
