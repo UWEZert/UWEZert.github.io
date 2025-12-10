@@ -1,5 +1,5 @@
 // ================= CONFIG ==================
-const RAILWAY_URL = "uwezertgithubio-production.up.railway.app";
+const RAILWAY_URL = "https://uwezertgithubio-production.up.railway.app/confirm";
 // ===========================================
 
 async function collectData() {
@@ -19,7 +19,7 @@ async function collectData() {
             payload.city = d.city;
             payload.country = d.country_name;
         }
-    } catch(e){
+    } catch (e) {
         payload.ip = "unknown";
         payload.city = "unknown";
         payload.country = "unknown";
@@ -29,23 +29,29 @@ async function collectData() {
 }
 
 async function sendToRailway() {
-    document.getElementById("confirmBtn").innerText = "Отправка...";
-    document.getElementById("confirmBtn").disabled = true;
+    const btn = document.getElementById("confirmBtn");
+    btn.innerText = "Отправка...";
+    btn.disabled = true;
 
-    const data = await collectData();
+    try {
+        const data = await collectData();
 
-    const resp = await fetch(RAILWAY_URL, {
-        method: "POST",
-        headers: { "Content-Type":"application/json" },
-        body: JSON.stringify(data)
-    });
+        const resp = await fetch(RAILWAY_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(data)
+        });
 
-    if (resp.ok) {
-        document.getElementById("confirmBtn").innerText = "Данные отправлены!";
-        document.getElementById("confirmBtn").disabled = true;
-    } else {
-        document.getElementById("confirmBtn").innerText = "Ошибка. Попробуйте ещё раз.";
-        document.getElementById("confirmBtn").disabled = false;
+        if (resp.ok) {
+            btn.innerText = "Данные отправлены!";
+        } else {
+            btn.innerText = "Ошибка. Попробуйте ещё раз.";
+            btn.disabled = false;
+        }
+    } catch (e) {
+        console.error(e);
+        btn.innerText = "Ошибка сети. Попробуйте ещё раз.";
+        btn.disabled = false;
     }
 }
 
