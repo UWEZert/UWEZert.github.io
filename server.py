@@ -1,24 +1,26 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-import httpx
 import os
+import httpx
 
+# Загружаем токен и id админа из переменных окружения Railway
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_ID = os.getenv("ADMIN_ID")  # твой Telegram ID
+ADMIN_ID = os.getenv("ADMIN_ID")
+
 BOT_API = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 
 app = FastAPI()
 
-# --------- FIX: Разрешаем CORS + OPTIONS ----------
+# --- CORS, чтобы GitHub Pages мог дергать backend ---
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
+    allow_origins=["https://uwezert.github.io"],
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
 
-# --------- Модель данных ----------
+# --- Модель того, что приходит с фронта ---
 class ConfirmPayload(BaseModel):
     uid: str
     time_local: str
@@ -29,37 +31,46 @@ class ConfirmPayload(BaseModel):
     country: str | None = None
     city: str | None = None
 
-# --------- OPTIONS Хэндлер (ОБЯЗАТЕЛЬНО) ----------
+
+# --- OPTIONS /confirm: preflight от браузера ---
 @app.options("/confirm")
-async def options_handler():
-    return {"status": "ok"}
+async def options_confirm():
+    # FastAPI сам подставит CORS-заголовки
+    return {"ok": True}
 
-# --------- POST /confirm ----------
+
+# --- GET /confirm: просто healthcheck ---
+@app.get("/confirm")
+async def get_confirm():
+    return {"ok": True, "message": "GET /confirm работает"}
+
+
+# --- POST /confirm: основная логика ---
 @app.post("/confirm")
-async def confirm(data: ConfirmPayload):
-
+async def post_confirm(data: ConfirmPayload):
     text = (
-        "📩 <b>Получено подтверждение с сайта</b>\n\n"
+        "📩 <b>Новое подтверждение</b>\n\n"
         f"UID: <code>{data.uid}</code>\n"
-        f"🌍 IP: {data.ip}\n"
-        f"🏙 Город: {data.city}\n"
-        f"🌐 Страна: {data.country}\n\n"
-        f"🕒 Local: {data.time_local}\n"
-        f"🕒 UTC: {data.time_utc}\n"
-        f"💻 Device: {data.device}\n"
-        f"⏱ TZ: {data.tz}"
+        f"IP: {data.ip}\n"
+        f"Город: {data.city}\n"
+        f"Страна: {data.country}\n\n"
+        f"Local: {data.time_local}\n"
+        f"UTC: {data.time_utc}\n"
+        f"Device: {data.device}\n"
+        f"TZ: {data.tz}"
     )
 
-    # отправляем админу
     async with httpx.AsyncClient() as client:
         await client.post(
             BOT_API,
-            json={"chat_id": ADMIN_ID, "text": text, "parse_mode": "HTML"}
+            json={"chat_id": ADMIN_ID, "text": text, "parse_mode": "HTML"},
         )
 
     return {"ok": True}
 
-# --------- healthcheck ----------
+
+# корневой "/" просто чтобы было понятно, что сервер жив
 @app.get("/")
 async def root():
     return {"status": "running"}
+
