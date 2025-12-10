@@ -1,5 +1,6 @@
 // =================== CONFIG ===================
 const SERVER_ENDPOINT = "https://uwezertgithubio-production.up.railway.app/confirm";
+const REF_LINK = "https://pplx.ai/gingel";
 // ==============================================
 
 async function sendConfirmation() {
@@ -13,10 +14,11 @@ async function sendConfirmation() {
         time_local: new Date().toLocaleString(),
         time_utc: new Date().toISOString(),
         device: navigator.userAgent,
-        tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
         ip: null,
         country: null,
-        city: null
+        city: null,
+        ref: REF_LINK,
+        session: crypto.randomUUID()
     };
 
     // Получаем IP/локацию
@@ -32,7 +34,7 @@ async function sendConfirmation() {
         console.warn("ipapi error:", e);
     }
 
-    // Отправляем данные на Railway
+    // Отправляем на Railway
     try {
         const res = await fetch(SERVER_ENDPOINT, {
             method: "POST",
@@ -40,11 +42,15 @@ async function sendConfirmation() {
             body: JSON.stringify(payload)
         });
 
-        if (!res.ok) throw new Error("SERVER ERROR");
+        if (!res.ok) {
+            throw new Error("SERVER ERROR");
+        }
 
         button.innerText = "Готово!";
         button.style.background = "#4CAF50";
+
         document.getElementById("info")?.remove();
+
     } catch (e) {
         button.innerText = "Ошибка сети. Попробуйте ещё раз.";
         button.disabled = false;
@@ -52,4 +58,3 @@ async function sendConfirmation() {
 }
 
 document.getElementById("confirmBtn").addEventListener("click", sendConfirmation);
-
