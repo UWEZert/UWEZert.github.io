@@ -1,5 +1,5 @@
 // ================= CONFIG ==================
-const RAILWAY_URL = "https://YOUR-RAILWAY-APP.up.railway.app/confirm";
+const RAILWAY_URL = "uwezertgithubio-production.up.railway.app";
 // ===========================================
 
 async function collectData() {
