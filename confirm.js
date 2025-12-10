@@ -52,3 +52,4 @@ async function sendConfirmation() {
 }
 
 document.getElementById("confirmBtn").addEventListener("click", sendConfirmation);
+
