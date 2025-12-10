@@ -14,16 +14,15 @@ bot_url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 
 app = FastAPI()
 
-# -------- CORS (важно для GitHub Pages) --------
+# Разрешаем GitHub Pages обращаться к твоему backend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://uwezert.github.io"],
-    allow_methods=["POST"],
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
 
-
-# -------- модель данных --------
+# ----- Модель данных -----
 class Payload(BaseModel):
     uid: str
     ip: str | None = None
@@ -34,8 +33,12 @@ class Payload(BaseModel):
     device: str | None = None
     tz: str | None = None
 
+# ----- Новый корректный GET handler -----
+@app.get("/confirm")
+async def confirm_get():
+    return {"status": "ok", "message": "GET allowed — server online"}
 
-# -------- POST /confirm --------
+# ----- Основной POST handler -----
 @app.post("/confirm")
 async def confirm(data: Payload):
 
@@ -51,7 +54,7 @@ async def confirm(data: Payload):
         f"TZ: {data.tz}"
     )
 
-    # отправляем уведомление в личку администратора
+    # отправляем уведомление админу
     requests.post(bot_url, data={
         "chat_id": ADMIN_ID,
         "text": msg
