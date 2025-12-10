@@ -1,217 +1,135 @@
-import os
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 import json
 from pathlib import Path
-from typing import Optional, Literal
+import os
+from dotenv import load_dotenv
+import requests
 
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-import httpx
+load_dotenv()
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
-TELEGRAM_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
-
-DB_PATH = Path("participants.json")
 
 app = FastAPI()
 
-# Разрешаем запросы с GitHub Pages
+# CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://uwezert.github.io"],
-    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_origins=["*"],
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
+DATA_FILE = Path("participants.json")
+if not DATA_FILE.exists():
+    DATA_FILE.write_text("{}", encoding="utf-8")
+
 
 def load_db():
-    if not DB_PATH.exists():
-        return {"counter": 0, "participants": {}}
-    with DB_PATH.open("r", encoding="utf-8") as f:
-        return json.load(f)
+    if DATA_FILE.exists():
+        return json.loads(DATA_FILE.read_text(encoding="utf-8"))
+    return {}
 
 
 def save_db(db):
-    with DB_PATH.open("w", encoding="utf-8") as f:
-        json.dump(db, f, ensure_ascii=False, indent=2)
+    DATA_FILE.write_text(json.dumps(db, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-class RegisterPayload(BaseModel):
-    uid: str
-    user_id: int
-    username: Optional[str] = None
-    first_name: Optional[str] = None
-
-
-class ConfirmPayload(BaseModel):
-    uid: str
-    time_local: str
-    time_utc: str
-    device: str
-    ip: Optional[str] = None
-    country: Optional[str] = None
-    city: Optional[str] = None
-    ref: Optional[str] = None
-    session: Optional[str] = None
-
-
-class DecisionPayload(BaseModel):
-    uid: str
-    action: Literal["approve", "reject"]
-
-
-@app.get("/")
-async def root():
-    return {"status": "running"}
-
-
-@app.post("/register")
-async def register(p: RegisterPayload):
+def country_to_flag(country_code: str | None) -> str:
     """
-    Вызывается ботом при /start — регистрируем пользователя и выдаём номер участника.
+    Превращает код страны 'US' → '🇺🇸'.
+    Если код пустой — возвращает пустую строку.
     """
-    db = load_db()
-    participants = db["participants"]
-
-    if p.uid in participants:
-        rec = participants[p.uid]
-        rec["user_id"] = p.user_id
-        rec["username"] = p.username
-        rec["first_name"] = p.first_name
-    else:
-        db["counter"] += 1
-        rec = {
-            "uid": p.uid,
-            "user_id": p.user_id,
-            "username": p.username,
-            "first_name": p.first_name,
-            "number": db["counter"],
-            "status": "waiting_confirm",
-            "site_data": None,
-        }
-        participants[p.uid] = rec
-
-    save_db(db)
-    return {"ok": True, "number": rec["number"]}
+    if not country_code or len(country_code) != 2:
+        return ""
+    return "".join(chr(ord(c.upper()) + 127397) for c in country_code)
 
 
-@app.options("/confirm")
-async def options_confirm():
-    # preflight CORS
-    return {"ok": True}
+def send_message(chat_id, text, reply_markup=None):
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    payload = {"chat_id": chat_id, "text": text}
+    if reply_markup:
+        payload["reply_markup"] = reply_markup
+    requests.post(url, json=payload)
 
 
 @app.post("/confirm")
-async def confirm(c: ConfirmPayload):
-    """
-    Вызывается сайтом при нажатии кнопки "Подтвердить участие".
-    """
+async def confirm(request: Request):
     db = load_db()
-    participants = db["participants"]
-    rec = participants.get(c.uid)
+    payload = await request.json()
 
-    if rec:
-        rec["status"] = "pending_review"
-        rec["site_data"] = c.dict()
+    uid = payload.get("uid")
+    if not uid:
+        return {"status": "error", "reason": "UID missing"}
+
+    # Если UID не зарегистрирован ботом
+    if uid not in db:
+        # Добавляем запись "без регистрации"
+        db[uid] = {
+            "user_id": None,
+            "username": None,
+            "status": "site_confirm_only",
+            "number": None,
+            "site": payload,
+        }
         save_db(db)
+        send_message(ADMIN_ID, f"⚠ Подтверждение без регистрации в боте!\nUID: {uid}")
+        return {"status": "ok"}
 
-    async with httpx.AsyncClient() as client:
-        # Сообщение участнику
-        if rec:
-            text_user = (
-                "Мы получили ваши данные, после сверивания вам придёт подтверждение "
-                "в участии, ожидайте!"
-            )
-            await client.post(
-                f"{TELEGRAM_API}/sendMessage",
-                json={"chat_id": rec["user_id"], "text": text_user},
-            )
+    # Если UID найден — обновляем данные участника
+    record = db[uid]
+    record["site"] = payload
+    record["status"] = "pending"
 
-        # Сообщение админу
-        lines = []
-        if rec:
-            lines.append(f"Новый участник #{rec['number']}")
-            lines.append(f"UID: {c.uid}")
-            uline = "Пользователь: "
-            if rec.get("username"):
-                uline += f"@{rec['username']} "
-            uline += f"(id {rec['user_id']})"
-            lines.append(uline)
-        else:
-            lines.append("⚠ Подтверждение без регистрации в боте!")
-            lines.append(f"UID: {c.uid}")
+    # Если номер отсутствует — присваиваем
+    if record.get("number") is None:
+        used_numbers = [v.get("number") for v in db.values() if v.get("number")]
+        next_num = max(used_numbers) + 1 if used_numbers else 1
+        record["number"] = next_num
 
-        lines.append("")
-        lines.append(f"Страна: {c.country}")
-        lines.append(f"Город: {c.city}")
-        lines.append(f"IP: {c.ip}")
-        lines.append(f"Local time: {c.time_local}")
-        lines.append(f"UTC: {c.time_utc}")
-        lines.append(f"Устройство: {c.device}")
-        text_admin = "\n".join(lines)
-
-        reply_markup = None
-        if rec:
-            reply_markup = {
-                "inline_keyboard": [[
-                    {"text": f"✅ Одобрить #{rec['number']}",
-                     "callback_data": f"approve:{c.uid}"},
-                    {"text": f"❌ Отклонить #{rec['number']}",
-                     "callback_data": f"reject:{c.uid}"},
-                ]]
-            }
-
-        await client.post(
-            f"{TELEGRAM_API}/sendMessage",
-            json={
-                "chat_id": ADMIN_ID,
-                "text": text_admin,
-                "reply_markup": reply_markup,
-            },
-        )
-
-    return {"ok": True}
-
-
-@app.post("/decision")
-async def decision(d: DecisionPayload):
-    """
-    Вызывается ботом, когда админ нажимает кнопку "Одобрить/Отклонить".
-    """
-    db = load_db()
-    participants = db["participants"]
-    rec = participants.get(d.uid)
-    if not rec:
-        raise HTTPException(status_code=404, detail="UID not found")
-
-    rec["status"] = "approved" if d.action == "approve" else "rejected"
     save_db(db)
 
-    async with httpx.AsyncClient() as client:
-        if d.action == "approve":
-            text = "Всё хорошо, вы участвуете в конкурсе, ожидайте результатов!"
-        else:
-            text = "К сожалению, вы не были допущены к участию в конкурсе."
+    # 1️⃣ Сообщение участнику
+    user_id = record["user_id"]
+    if user_id:
+        send_message(user_id, "Мы получили ваши данные, после сверивания вам придёт подтверждение в участии, ожидайте!")
 
-        await client.post(
-            f"{TELEGRAM_API}/sendMessage",
-            json={"chat_id": rec["user_id"], "text": text},
-        )
+    # 2️⃣ Сообщение админу
+    site = payload
+    country = site.get("country") or "??"
+    flag = country_to_flag(country)
+    city = site.get("city", "?")
+    ip = site.get("ip", "?")
+    t_local = site.get("time_local", "?")
+    t_utc = site.get("time_utc", "?")
+    device = site.get("device", "?")
 
-    return {
-        "ok": True,
-        "status": rec["status"],
-        "number": rec["number"],
-        "uid": d.uid,
+    username = record.get("username")
+    tgline = f"@{username}" if username else "(username hidden)"
+
+    text_admin = (
+        f"Новый участник #{record['number']}\n"
+        f"UID: {uid}\n\n"
+        f"Пользователь: {tgline} (id {record['user_id']})\n\n"
+        f"{flag} {country}\n"
+        f"Город: {city}\n"
+        f"IP: {ip}\n"
+        f"Local time: {t_local}\n"
+        f"UTC: {t_utc}\n"
+        f"Устройство: {device}"
+    )
+
+    # Inline-кнопки "Одобрить / Отклонить"
+    markup = {
+        "inline_keyboard": [
+            [
+                {"text": "Одобрить", "callback_data": f"approve:{uid}"},
+                {"text": "Отклонить", "callback_data": f"reject:{uid}"},
+            ]
+        ]
     }
 
+    send_message(ADMIN_ID, text_admin, reply_markup=markup)
 
-@app.post("/reset")
-async def reset():
-    """
-    Полный сброс списка участников и нумерации.
-    """
-    db = {"counter": 0, "participants": {}}
-    save_db(db)
-    return {"ok": True}
+    return {"status": "ok"}
