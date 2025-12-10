@@ -1,26 +1,29 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-import requests
 import os
+import requests
 from dotenv import load_dotenv
 
 load_dotenv()
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-CHAT_ID_URL = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+ADMIN_ID  = os.getenv("ADMIN_ID")
+
+bot_url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 
 app = FastAPI()
 
-# Разрешаем запросы с твоего GitHub Pages
+# -------- CORS (важно для GitHub Pages) --------
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://uwezert.github.io"],
-    allow_credentials=False,
-    allow_methods=["POST", "OPTIONS"],
+    allow_methods=["POST"],
     allow_headers=["*"],
 )
 
+
+# -------- модель данных --------
 class Payload(BaseModel):
     uid: str
     ip: str | None = None
@@ -31,23 +34,27 @@ class Payload(BaseModel):
     device: str | None = None
     tz: str | None = None
 
+
+# -------- POST /confirm --------
 @app.post("/confirm")
 async def confirm(data: Payload):
-    message = (
-        f"Новое подтверждение:\n"
+
+    msg = (
+        "🔥 Новое подтверждение!\n\n"
         f"UID: {data.uid}\n"
+        f"IP: {data.ip}\n"
         f"Город: {data.city}\n"
         f"Страна: {data.country}\n"
-        f"Время (local): {data.time_local}\n"
-        f"Время (UTC): {data.time_utc}"
+        f"Local time: {data.time_local}\n"
+        f"UTC: {data.time_utc}\n"
+        f"Устройство: {data.device}\n"
+        f"TZ: {data.tz}"
     )
 
-    requests.post(
-        CHAT_ID_URL,
-        data={
-            "chat_id": os.getenv("ADMIN_ID"),
-            "text": message
-        }
-    )
+    # отправляем уведомление в личку администратора
+    requests.post(bot_url, data={
+        "chat_id": ADMIN_ID,
+        "text": msg
+    })
 
     return {"status": "ok"}
