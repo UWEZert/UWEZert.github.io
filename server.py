@@ -11,8 +11,8 @@ from pydantic import BaseModel
 
 
 # ================== ENV (Railway Variables) ==================
-BOT_TOKEN = os.getenv("BOT_TOKEN")  # обязателен
-ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))  # обязателен (твой TG id)
+BOT_TOKEN = os.getenv("BOT_TOKEN")  
+ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))  
 # ============================================================
 
 if not BOT_TOKEN:
@@ -93,8 +93,8 @@ class ConfirmPayload(BaseModel):
     time_utc: str
     device: str
     ip: Optional[str] = None
-    country: Optional[str] = None         # может быть названием страны
-    country_code: Optional[str] = None    # если передашь 2-буквенный код — будет флаг
+    country: Optional[str] = None         
+    country_code: Optional[str] = None    
     city: Optional[str] = None
     ref: Optional[str] = None
     session: Optional[str] = None
@@ -161,29 +161,29 @@ def confirm(c: ConfirmPayload):
     participants = db["participants"]
     rec = participants.get(c.uid)
 
-    # Запишем подтверждение даже если человек не регистрировался в боте (на всякий)
+  
     if rec:
         rec["status"] = "pending_review"
         rec["site_data"] = c.dict()
         save_db(db)
 
-        # Сообщение участнику №3
+        
         try:
             send_message(
                 rec["user_id"],
                 "Мы получили ваши данные, после сверивания вам придёт подтверждение в участии, ожидайте!"
             )
         except Exception as e:
-            # не валим запрос пользователю, но админу сообщим
+        
             if ADMIN_ID:
                 send_message(ADMIN_ID, f"⚠ Не удалось написать участнику UID={c.uid}: {e}")
     else:
-        # если нет регистрации — предупредим админа
+        
         if ADMIN_ID:
             send_message(ADMIN_ID, f"⚠ Подтверждение без /start регистрации в боте.\nUID: {c.uid}")
         return {"ok": True, "warning": "uid_not_registered_in_bot"}
 
-    # Подготовка карточки админу
+ 
     country_name = c.country or "unknown"
     code = (c.country_code or "").strip()
     if not code and c.country and len(c.country.strip()) == 2:
