@@ -1,36 +1,50 @@
+import os
+import json
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-import uvicorn
 
-from bot import process_verification
+# ====== настройки ======
+DATA_DIR = Path("data")
+DATA_DIR.mkdir(exist_ok=True)
+SUBMISSIONS_FILE = DATA_DIR / "submissions.jsonl"
+# =======================
 
 app = FastAPI()
 
-# Разрешаем запросы с GitHub Pages
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://uwezert.github.io",
-        "https://uwezert.github.io/",
-    ],
+    allow_origins=["*"],
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+@app.get("/")
+async def root():
+    return {"ok": True, "service": "confirm-api"}
+
 @app.get("/health")
 async def health():
-    return {"ok": True}
+    return {"ok": True, "time": datetime.utcnow().isoformat()}
 
 @app.post("/confirm")
 async def confirm(request: Request):
-    data = await request.json()  # строго JSON
-    uid = data.get("uid")
+    
+    payload: Dict[str, Any] = await request.json()
+
+    # Минимальная проверка
+    uid = payload.get("uid")
     if not uid:
-        return {"status": "error", "reason": "uid_missing"}
+        return {"ok": False, "error": "uid_missing"}
 
-    await process_verification(uid, data)
-    return {"status": "ok"}
+    payload["_received_at_utc"] = datetime.utcnow().isoformat()
 
-if __name__ == "__main__":
-    uvicorn.run("server:app", host="0.0.0.0", port=8080)
+    
+    with SUBMISSIONS_FILE.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(payload, ensure_ascii=False) + "\n")
+
+    return {"ok": True}
