@@ -32,9 +32,11 @@ async function sendConfirmation() {
         const resIp = await fetch("https://ipapi.co/json/");
         if (resIp.ok) {
             const js = await resIp.json();
-            payload.ip = js.ip;
-            payload.city = js.city;
-            payload.country = js.country_name;
+           payload.ip = js.ip;
+payload.city = js.city;
+payload.country = js.country_name;   // название
+payload.country_code = js.country;   // код (для флага)
+
         }
     } catch (e) {
         console.warn("ipapi error:", e);
