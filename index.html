@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Подтверждение участия</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="card">
+    <h1>Подтверждение участия</h1>
+    <p class="muted">
+      Мы зафиксируем время и (если вы разрешите) геолокацию — и отправим это на проверку.
+    </p>
+
+    <div class="kv">
+      <div class="k">UID</div>
+      <div class="v"><code id="uid">—</code></div>
+      <div class="k">Backend</div>
+      <div class="v"><code id="api">—</code></div>
+      <div class="k">Статус</div>
+      <div class="v" id="status">Готово к подтверждению</div>
+    </div>
+
+    <div class="actions">
+      <button id="btnConfirm">Подтвердить</button>
+      <button id="btnRetry" class="secondary" style="display:none;">Повторить</button>
+    </div>
+
+    <details>
+      <summary>Что будет отправлено</summary>
+      <pre id="preview">{}</pre>
+    </details>
+
+    <p class="muted small">
+      Совет: откройте ссылку в обычном браузере (Safari/Chrome), разрешите геолокацию — и нажмите «Подтвердить».
+    </p>
+  </main>
+
+  <script src="confirm.js"></script>
+</body>
+</html>
