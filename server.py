@@ -13,7 +13,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-# --- ИМПОРТ STORAGE ТЕПЕРЬ ОБЯЗАТЕЛЕН ---
+# --- ИМПОРТ STORAGE ---
 from db import Storage # Импортируем Storage
 
 # --- Настройка логирования ---
@@ -175,7 +175,7 @@ async def confirm(req: Request, data: ConfirmIn) -> dict[str, str]:
 
     # --- ШАГ 1: Получить геоданные по IP ---
     geo_data = await get_geo_data_from_ip(ip)
-    if not geo_data:
+    if not geo_
         # --- КРИТИЧЕСКОЕ ИЗМЕНЕНИЕ ---
         logger.warning(f"Failed to resolve location for IP {ip} during confirmation for UID {data.uid}. Returning error to client.")
         raise HTTPException(status_code=400, detail="location_resolution_failed")
@@ -194,12 +194,6 @@ async def confirm(req: Request, data: ConfirmIn) -> dict[str, str]:
         )
         logger.info(f"Confirmation successful for UID {data.uid}, including geo data.")
         # --- УБРАНО: Вызов notify_admin --- Сервер больше не отправляет уведомления
-        # if bot_for_notification and admin_id_for_notification:
-        #     participant = await storage.get_participant(data.uid)
-        #     if participant:
-        #         active_contest_id = await storage.get_active_contest_id()
-        #         if participant.contest_id == active_contest_id:
-        #             asyncio.create_task(notify_admin_on_new_submission_internal(...))
 
     except ValueError as e:
         code = str(e)
@@ -213,12 +207,36 @@ async def confirm(req: Request, data: ConfirmIn) -> dict[str, str]:
 
     return {"status": "ok_with_geo"}
 
-# --- УБРАНА ВНУТРЕННЯЯ ФУНКЦИЯ УВЕДОМЛЕНИЯ ---
-# async def notify_admin_on_new_submission_internal(...):
-#     ...
+# --- НОВЫЙ ЭНДПОИНТ ДЛЯ БОТА ---
+@app.get("/new_confirmations_for_admin")
+async def get_new_confirmations_for_admin(_: None = Depends(require_api_key)) -> dict[str, Any]:
+    """
+    Возвращает список новых подтверждений для администратора.
+    Используется ботом для опроса (polling) новых участников.
+    """
+    logger.info("New confirmations endpoint called by admin bot.")
+    # Получаем участников со статусом 'submitted_for_current_contest' в активном конкурсе
+    # Это те, кто успешно подтвердил с гео-данными, но еще не уведомлен админу
+    items = await storage.pending(limit=50) # Используем существующий метод, предполагая, что он ищет awaiting_approval
+    # НО нам нужно, чтобы он искал submitted_for_current_contest!
+    # Изменим логику: confirm ставит submitted_for_current_contest.
+    # polling_task в bot.py находит submitted_for_current_contest, обновляет до awaiting_approval и уведомляет.
+    # Тогда этот эндпоинт должен возвращать awaiting_approval?
+    # Да, если bot.py использует этот эндпоинт, он должен возвращать awaiting_approval.
+    # storage.pending уже ищет awaiting_approval.
+    # Но polling_task в старом варианте искал submitted_for_current_contest.
+    # Переопределим: confirm ставит awaiting_approval сразу при успехе гео.
+    # Тогда polling_task в bot.py (новый вариант) будет опрашивать этот эндпоинт.
+    # Этот эндпоинт возвращает awaiting_approval.
+    # Бот уведомляет админа и оставляет статус awaiting_approval.
+    # Решение (approve/reject) меняет статус на approved/rejected.
+    # Это логично.
 
-# --- Импорты для кнопок (не нужны здесь) ---
-# from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+    # Проверим, что storage.pending действительно ищет awaiting_approval в активном конкурсе
+    # Да, в обновленном db.py метод pending ищет именно это.
+    logger.info(f"Returning {len(items)} confirmations awaiting admin review via API.")
+    return {"items": items}
+
 
 @app.get("/pending") # Опционально, если используется как резерв
 async def pending(limit: int = 10, _: None = Depends(require_api_key)) -> dict[str, Any]:
@@ -228,7 +246,7 @@ async def pending(limit: int = 10, _: None = Depends(require_api_key)) -> dict[s
     return {"items": items}
 
 @app.post("/decision")
-async def decision(data: DecisionIn, _: None = Depends(require_api_key)) -> dict[str, Any]:
+async def decision( DecisionIn, _: None = Depends(require_api_key)) -> dict[str, Any]:
     admin_id = int(data.admin_id or 0)
     if admin_id <= 0:
         admin_id = -1
