@@ -130,9 +130,10 @@ class Storage:
             await db.execute("PRAGMA foreign_keys=ON;")
 
             # If already registered, return token.
-            row = await db.execute_fetchone(
+            cursor = await db.execute(
                 "SELECT token FROM participants WHERE uid = ?;", (uid,)
             )
+            row = await cursor.fetchone()
             if row and row[0]:
                 return str(row[0])
 
@@ -187,10 +188,11 @@ class Storage:
             await db.execute("PRAGMA busy_timeout=30000;")
             await db.execute("PRAGMA foreign_keys=ON;")
 
-            row = await db.execute_fetchone(
+            cursor = await db.execute(
                 "SELECT token, status, decision FROM participants WHERE uid = ?;",
                 (uid,),
             )
+            row = await cursor.fetchone()
             if not row:
                 raise ValueError("unknown_uid")
             expected_token, status, decision = row
@@ -241,7 +243,7 @@ class Storage:
             await db.execute("PRAGMA busy_timeout=30000;")
             await db.execute("PRAGMA foreign_keys=ON;")
 
-            rows = await db.execute_fetchall(
+            cursor = await db.execute(
                 """
                 SELECT p.uid, p.user_id, p.chat_id, p.username, p.first_name, p.last_name,
                        p.created_at,
@@ -254,6 +256,7 @@ class Storage:
                 """,
                 (int(limit),),
             )
+            rows = await cursor.fetchall()
 
             out: list[dict[str, Any]] = []
             for r in rows:
@@ -287,10 +290,11 @@ class Storage:
             await db.execute("PRAGMA busy_timeout=30000;")
             await db.execute("PRAGMA foreign_keys=ON;")
 
-            row = await db.execute_fetchone(
+            cursor = await db.execute(
                 "SELECT uid, token, user_id, chat_id, username, first_name, last_name, created_at, status, decided_at, decision, decision_by, decision_note FROM participants WHERE uid = ?;",
                 (uid,),
             )
+            row = await cursor.fetchone()
             if not row:
                 raise ValueError("unknown_uid")
 
@@ -322,10 +326,11 @@ class Storage:
             )
             await db.commit()
 
-            row2 = await db.execute_fetchone(
+            cursor2 = await db.execute(
                 "SELECT uid, token, user_id, chat_id, username, first_name, last_name, created_at, status, decided_at, decision, decision_by, decision_note FROM participants WHERE uid = ?;",
                 (uid,),
             )
+            row2 = await cursor2.fetchone()
             assert row2 is not None
             return Participant(
                 uid=row2[0],
@@ -358,10 +363,11 @@ class Storage:
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute("PRAGMA busy_timeout=30000;")
             await db.execute("PRAGMA foreign_keys=ON;")
-            row = await db.execute_fetchone(
+            cursor = await db.execute(
                 "SELECT uid, token, user_id, chat_id, username, first_name, last_name, created_at, status, decided_at, decision, decision_by, decision_note FROM participants WHERE uid = ?;",
                 (uid,),
             )
+            row = await cursor.fetchone()
             if not row:
                 return None
             return Participant(
