@@ -13,7 +13,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-# --- ИМПОРТ STORAGE ---
+# --- ИМПОРТ STORAGE ТЕПЕРЬ ОБЯЗАТЕЛЕН ---
 from db import Storage # Импортируем Storage
 
 # --- Настройка логирования ---
@@ -143,6 +143,12 @@ class DecisionIn(BaseModel):
     note: Optional[str] = None
     admin_id: Optional[int] = None
 
+class CreateContestIn(BaseModel):
+    name: str
+
+class CreateContestOut(BaseModel):
+    contest_id: int
+
 @app.get("/health")
 async def health() -> dict[str, str]:
     logger.info("Health check endpoint called")
@@ -172,12 +178,14 @@ async def confirm(req: Request, data: ConfirmIn) -> dict[str, str]:
     ip = _client_ip(req)
     user_agent = req.headers.get("user-agent")
     logger.info(f"Confirmation request for UID {data.uid} from IP {ip}")
+
     # --- ШАГ 1: Получить геоданные по IP ---
     geo_data = await get_geo_data_from_ip(ip)
-    if not geo_data: # <-- ИСПРАВЛЕНО: добавлено 'data' и двоеточие
-    # --- КРИТИЧЕСКОЕ ИЗМЕНЕНИЕ ---
+    if not geo_data: # --- ИСПРАВЛЕНО: добавлено 'data' и двоеточие ---
+        # --- КРИТИЧЕСКОЕ ИЗМЕНЕНИЕ ---
         logger.warning(f"Failed to resolve location for IP {ip} during confirmation for UID {data.uid}. Returning error to client.")
         raise HTTPException(status_code=400, detail="location_resolution_failed")
+
     # --- ШАГ 2: Добавить геоданные к payload ---
     data.payload.update(geo_data)
     logger.debug(f"Final payload with geo data for UID {data.uid}")
@@ -205,36 +213,29 @@ async def confirm(req: Request, data: ConfirmIn) -> dict[str, str]:
 
     return {"status": "ok_with_geo"}
 
-# --- НОВЫЙ ЭНДПОИНТ ДЛЯ БОТА ---
+# --- НОВЫЙ ЭНДПОИНТ ДЛЯ БОТА (API POLLING) ---
 @app.get("/new_confirmations_for_admin")
 async def get_new_confirmations_for_admin(_: None = Depends(require_api_key)) -> dict[str, Any]:
     """
-    Возвращает список новых подтверждений для администратора.
+    Возвращает список новых подтверждений для администратора, включая геоданные.
     Используется ботом для опроса (polling) новых участников.
     """
     logger.info("New confirmations endpoint called by admin bot.")
-    # Получаем участников со статусом 'submitted_for_current_contest' в активном конкурсе
-    # Это те, кто успешно подтвердил с гео-данными, но еще не уведомлен админу
-    items = await storage.pending(limit=50) # Используем существующий метод, предполагая, что он ищет awaiting_approval
-    # НО нам нужно, чтобы он искал submitted_for_current_contest!
-    # Изменим логику: confirm ставит submitted_for_current_contest.
-    # polling_task в bot.py находит submitted_for_current_contest, обновляет до awaiting_approval и уведомляет.
-    # Тогда этот эндпоинт должен возвращать awaiting_approval?
-    # Да, если bot.py использует этот эндпоинт, он должен возвращать awaiting_approval.
-    # storage.pending уже ищет awaiting_approval.
-    # Но polling_task в старом варианте искал submitted_for_current_contest.
-    # Переопределим: confirm ставит awaiting_approval сразу при успехе гео.
-    # Тогда polling_task в bot.py (новый вариант) будет опрашивать этот эндпоинт.
-    # Этот эндпоинт возвращает awaiting_approval.
-    # Бот уведомляет админа и оставляет статус awaiting_approval.
-    # Решение (approve/reject) меняет статус на approved/rejected.
-    # Это логично.
+    items = await storage.pending(limit=50)
+    enhanced_items = []
 
-    # Проверим, что storage.pending действительно ищет awaiting_approval в активном конкурсе
-    # Да, в обновленном db.py метод pending ищет именно это.
-    logger.info(f"Returning {len(items)} confirmations awaiting admin review via API.")
-    return {"items": items}
+    for item in items:
+        uid = item["uid"]
+        # Получаем последний сабмит для извлечения geo_data
+        last_submission_info = await storage.get_last_submission_info(uid)
+        geo_data = last_submission_info.get("payload_json", {}).get("ip_resolved_location", {}) if last_submission_info else {}
+        # Добавляем geo_data к item
+        enhanced_item = item.copy()
+        enhanced_item['submission_payload'] = last_submission_info.get("payload_json", {}) if last_submission_info else {}
+        enhanced_items.append(enhanced_item)
 
+    logger.info(f"Returning {len(enhanced_items)} confirmations awaiting admin review via API with geo data.")
+    return {"items": enhanced_items}
 
 @app.get("/pending") # Опционально, если используется как резерв
 async def pending(limit: int = 10, _: None = Depends(require_api_key)) -> dict[str, Any]:
@@ -244,7 +245,7 @@ async def pending(limit: int = 10, _: None = Depends(require_api_key)) -> dict[s
     return {"items": items}
 
 @app.post("/decision")
-async def decision( DecisionIn, _: None = Depends(require_api_key)) -> dict[str, Any]:
+async def decision(data: DecisionIn, _: None = Depends(require_api_key)) -> dict[str, Any]:
     admin_id = int(data.admin_id or 0)
     if admin_id <= 0:
         admin_id = -1
@@ -272,7 +273,7 @@ async def decision( DecisionIn, _: None = Depends(require_api_key)) -> dict[str,
             "status": p.status,
             "decision": p.decision,
             "decided_at": p.decided_at,
-            "decision_note": p.decition_note,
+            "decision_note": p.decision_note,
             "contest_id": p.contest_id,
         },
     }
@@ -283,6 +284,20 @@ async def reset(_: None = Depends(require_api_key)) -> dict[str, str]:
     await storage.reset()
     logger.info("Database reset completed")
     return {"status": "ok"}
+
+# --- НОВЫЕ ЭНДПОИНТЫ ДЛЯ АДМИНИСТРАТИВНЫХ КОМАНД БОТА ---
+@app.post("/create_contest", response_model=CreateContestOut)
+async def create_contest_api(data: CreateContestIn, _: None = Depends(require_api_key)) -> CreateContestOut:
+    name = data.name or f"Contest_{utc_now_iso()}"
+    contest_id = await storage.create_contest(name)
+    logger.info(f"Contest '{name}' (ID: {contest_id}) created via API.")
+    return CreateContestOut(contest_id=contest_id)
+
+@app.get("/list_contests")
+async def list_contests_api(_: None = Depends(require_api_key)) -> dict[str, Any]:
+    contests = await storage.get_all_contests()
+    logger.info(f"Fetched {len(contests)} contests via API.")
+    return {"contests": contests}
 
 if __name__ == "__main__":
     import uvicorn
