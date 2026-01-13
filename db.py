@@ -275,7 +275,6 @@ class Storage:
             )
 
             # status progression: registered -> submitted_for_current_contest -> awaiting_approval -> approved/rejected
-            # Устанавливаем статус сразу на submitted_for_current_contest, бот сам вызовет обновление до awaiting_approval при polling
             await db.execute(
                 """
                 UPDATE participants
@@ -289,10 +288,9 @@ class Storage:
             )
             await db.commit()
 
-    # --- ИСПРАВЛЕННЫЙ МЕТОД pending ---
     async def pending(self, *, limit: int = 10) -> list[dict[str, Any]]:
         """Return latest pending submissions (awaiting approval for current contest)."""
-        await self.init() # Инициализация storage при первом вызове метода
+        # await self.init() # Вызов init() не должен быть здесь, если он уже вызывается в других местах при старте
         active_contest_id = await self.get_active_contest_id()
         if not active_contest_id:
              print("WARNING: No active contest found for pending list.")
