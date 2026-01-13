@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 from typing import Any, Optional
 
@@ -10,6 +11,10 @@ from pydantic import BaseModel, Field
 
 from db import Storage
 
+# --- Настройка логирования ---
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
 # Load .env for local development. Railway uses env vars directly, so this is safe.
 load_dotenv()
 
@@ -17,12 +22,14 @@ DB_PATH = os.getenv("DB_PATH", "data/app.db")
 BACKEND_API_KEY = os.getenv("BACKEND_API_KEY", "")
 
 # Comma-separated list of allowed origins for the static page
-# Example: "https://uwezert.github.io,https://uwezert.github.io/"
+# Example: "https://uwezert.github.io  ,https://uwezert.github.io/  "
 CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "*").split(",") if o.strip()]
+logger.info(f"CORS origins configured: {CORS_ORIGINS}")
 
 app = FastAPI(title="UWEZert Verification Backend")
 
 if CORS_ORIGINS == ["*"]:
+    logger.warning("CORS is open to all origins (*). This is insecure for production.")
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
@@ -46,15 +53,23 @@ def _client_ip(req: Request) -> Optional[str]:
     # Railway sits behind a proxy; X-Forwarded-For is typically set.
     xff = req.headers.get("x-forwarded-for")
     if xff:
-        return xff.split(",")[0].strip()
-    return req.client.host if req.client else None
+        ip = xff.split(",")[0].strip()
+        logger.debug(f"Client IP determined from X-Forwarded-For: {ip}")
+        return ip
+    ip = req.client.host if req.client else None
+    logger.debug(f"Client IP determined from request.client: {ip}")
+    return ip
 
 
 async def require_api_key(x_api_key: Optional[str] = Header(default=None)) -> None:
+    logger.debug(f"Validating API key in header: {x_api_key is not None}")
     if not BACKEND_API_KEY:
+        logger.error("BACKEND_API_KEY not set on the server!")
         raise HTTPException(status_code=500, detail="BACKEND_API_KEY not set")
     if not x_api_key or x_api_key != BACKEND_API_KEY:
+        logger.warning(f"Unauthorized access attempt with key: {x_api_key}")
         raise HTTPException(status_code=401, detail="unauthorized")
+    logger.debug("API key validation successful")
 
 
 class RegisterIn(BaseModel):
@@ -86,12 +101,18 @@ class DecisionIn(BaseModel):
 
 @app.get("/health")
 async def health() -> dict[str, str]:
+    logger.info("Health check endpoint called")
     await storage.init()
+    logger.info("Health check passed")
     return {"status": "ok"}
 
 
 @app.post("/register", response_model=RegisterOut)
 async def register(req: Request, data: RegisterIn) -> RegisterOut:
+    ip = _client_ip(req)
+    logger.info(f"Registration request for UID {data.uid} from IP {ip}")
+    logger.debug(f"Registration data: {data.dict()}")
+
     token = await storage.register(
         uid=data.uid,
         user_id=data.user_id,
@@ -99,32 +120,46 @@ async def register(req: Request, data: RegisterIn) -> RegisterOut:
         username=data.username,
         first_name=data.first_name,
         last_name=data.last_name,
-        ip=_client_ip(req),
+        ip=ip,
     )
+    logger.info(f"Registration successful for UID {data.uid}, generated token")
     return RegisterOut(token=token)
 
 
 @app.post("/confirm")
 async def confirm(req: Request, data: ConfirmIn) -> dict[str, str]:
+    ip = _client_ip(req)
+    user_agent = req.headers.get("user-agent")
+    logger.info(f"Confirmation request for UID {data.uid} from IP {ip}")
+    logger.debug(f"Confirmation payload: {data.payload}")
+    
     try:
         await storage.confirm(
             uid=data.uid,
             token=data.token,
             payload=data.payload,
-            ip=_client_ip(req),
-            user_agent=req.headers.get("user-agent"),
+            ip=ip,
+            user_agent=user_agent,
         )
+        logger.info(f"Confirmation successful for UID {data.uid}")
     except ValueError as e:
         code = str(e)
+        logger.warning(f"Confirmation failed for UID {data.uid} due to: {code}")
         if code in ("unknown_uid", "bad_token"):
             raise HTTPException(status_code=400, detail=code)
         raise
+    except Exception as e:
+        logger.error(f"Unexpected error during confirmation for UID {data.uid}: {e}")
+        raise HTTPException(status_code=500, detail="internal_error")
+    
     return {"status": "ok"}
 
 
 @app.get("/pending")
 async def pending(limit: int = 10, _: None = Depends(require_api_key)) -> dict[str, Any]:
+    logger.info(f"Pending list requested with limit {limit}")
     items = await storage.pending(limit=int(limit))
+    logger.info(f"Returning {len(items)} pending items")
     return {"items": items}
 
 
@@ -134,10 +169,17 @@ async def decision(data: DecisionIn, _: None = Depends(require_api_key)) -> dict
     if admin_id <= 0:
         # keep it optional, but encourage sending
         admin_id = -1
+    logger.info(f"Decision request received for UID {data.uid} by admin {admin_id}, action: {data.action}")
+    
     try:
         p = await storage.decide(uid=data.uid, action=data.action, admin_id=admin_id, note=data.note)
+        logger.info(f"Decision '{data.action}' applied successfully for UID {data.uid}")
     except ValueError as e:
+        logger.error(f"Decision failed for UID {data.uid} due to invalid UID: {e}")
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Unexpected error during decision for UID {data.uid}: {e}")
+        raise HTTPException(status_code=500, detail="internal_error")
 
     return {
         "status": "ok",
@@ -158,7 +200,9 @@ async def decision(data: DecisionIn, _: None = Depends(require_api_key)) -> dict
 
 @app.post("/reset")
 async def reset(_: None = Depends(require_api_key)) -> dict[str, str]:
+    logger.info("Reset command received via API")
     await storage.reset()
+    logger.info("Database reset completed")
     return {"status": "ok"}
 
 
@@ -167,4 +211,5 @@ if __name__ == "__main__":
     import uvicorn
 
     port = int(os.getenv("PORT", "8000"))
+    logger.info(f"Starting server on port {port}")
     uvicorn.run("server:app", host="0.0.0.0", port=port, reload=False)
