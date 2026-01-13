@@ -1,15 +1,20 @@
+# server.py
 from __future__ import annotations
 
 import logging
 import os
 from typing import Any, Optional
 
+import httpx # Добавлен
+import asyncio # Добавлен
+
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from db import Storage
+# --- ИМПОРТ STORAGE ТЕПЕРЬ ОБЯЗАТЕЛЕН ---
+from db import Storage # Импортируем Storage
 
 # --- Настройка логирования ---
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -22,7 +27,6 @@ DB_PATH = os.getenv("DB_PATH", "data/app.db")
 BACKEND_API_KEY = os.getenv("BACKEND_API_KEY", "")
 
 # Comma-separated list of allowed origins for the static page
-# Example: "https://uwezert.github.io  ,https://uwezert.github.io/  "
 CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "*").split(",") if o.strip()]
 logger.info(f"CORS origins configured: {CORS_ORIGINS}")
 
@@ -46,11 +50,10 @@ else:
         allow_headers=["*"],
     )
 
+# --- ИНИЦИАЛИЗАЦИЯ STORAGE ---
 storage = Storage(DB_PATH)
 
-
 def _client_ip(req: Request) -> Optional[str]:
-    # Railway sits behind a proxy; X-Forwarded-For is typically set.
     xff = req.headers.get("x-forwarded-for")
     if xff:
         ip = xff.split(",")[0].strip()
@@ -60,6 +63,53 @@ def _client_ip(req: Request) -> Optional[str]:
     logger.debug(f"Client IP determined from request.client: {ip}")
     return ip
 
+# --- Функция геолокации по IP ---
+GEO_IP_TIMEOUT = 5.0
+GEO_IP_PROVIDER = "ip-api.com" # Вы можете выбрать другой
+
+async def get_geo_data_from_ip(ip_address: str) -> Optional[dict[str, Any]]:
+    """Получает геоданные по IP-адресу."""
+    if not ip_address or ip_address in ['127.0.0.1', '::1']:
+         logger.warning(f"Skipping geo lookup for local IP: {ip_address}")
+         return None
+
+    url = f"http://{GEO_IP_PROVIDER}/json/{ip_address}"
+
+    try:
+        async with httpx.AsyncClient(timeout=GEO_IP_TIMEOUT) as client:
+            response = await client.get(url)
+            response.raise_for_status()
+            data = response.json()
+            if data.get('status') == 'success':
+                 geo_result = {
+                     "ip_resolved_location": {
+                         "query": data.get('query'),
+                         "country": data.get('country'),
+                         "region": data.get('regionName'),
+                         "city": data.get('city'),
+                         "lat": data.get('lat'),
+                         "lon": data.get('lon'),
+                         "timezone": data.get('timezone'),
+                         "isp": data.get('isp'),
+                         "org": data.get('org'),
+                     }
+                 }
+                 logger.info(f"Geo data fetched for IP {ip_address}: {geo_result['ip_resolved_location'].get('city')}, {geo_result['ip_resolved_location'].get('country')}")
+                 return geo_result
+            else:
+                 logger.warning(f"Geo API returned non-success status for IP {ip_address}: {data.get('status', 'unknown_status')}, message: {data.get('message', 'no_message')}")
+                 return None
+
+    except httpx.TimeoutException:
+        logger.error(f"Timeout while fetching geo data for IP {ip_address}")
+    except httpx.HTTPStatusError as e:
+        logger.error(f"HTTP error {e.response.status_code} from Geo API for IP {ip_address}: {e}")
+    except httpx.RequestError as e:
+        logger.error(f"Request error to Geo API for IP {ip_address}: {e}")
+    except Exception as e:
+        logger.error(f"Unexpected error during geo lookup for IP {ip_address}: {e}")
+
+    return None
 
 async def require_api_key(x_api_key: Optional[str] = Header(default=None)) -> None:
     logger.debug(f"Validating API key in header: {x_api_key is not None}")
@@ -71,7 +121,6 @@ async def require_api_key(x_api_key: Optional[str] = Header(default=None)) -> No
         raise HTTPException(status_code=401, detail="unauthorized")
     logger.debug("API key validation successful")
 
-
 class RegisterIn(BaseModel):
     uid: str = Field(..., min_length=6)
     user_id: int
@@ -80,17 +129,13 @@ class RegisterIn(BaseModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
 
-
 class RegisterOut(BaseModel):
     token: str
-
 
 class ConfirmIn(BaseModel):
     uid: str
     token: str
-    # Free-form payload from the browser (geo/time/userAgent/etc.)
     payload: dict[str, Any] = Field(default_factory=dict)
-
 
 class DecisionIn(BaseModel):
     uid: str
@@ -98,20 +143,17 @@ class DecisionIn(BaseModel):
     note: Optional[str] = None
     admin_id: Optional[int] = None
 
-
 @app.get("/health")
 async def health() -> dict[str, str]:
     logger.info("Health check endpoint called")
-    await storage.init()
+    await storage.init() # Инициализация storage при первом запросе
     logger.info("Health check passed")
     return {"status": "ok"}
-
 
 @app.post("/register", response_model=RegisterOut)
 async def register(req: Request, data: RegisterIn) -> RegisterOut:
     ip = _client_ip(req)
     logger.info(f"Registration request for UID {data.uid} from IP {ip}")
-    logger.debug(f"Registration data: {data.dict()}")
 
     token = await storage.register(
         uid=data.uid,
@@ -122,17 +164,26 @@ async def register(req: Request, data: RegisterIn) -> RegisterOut:
         last_name=data.last_name,
         ip=ip,
     )
-    logger.info(f"Registration successful for UID {data.uid}, generated token")
+    logger.info(f"Registration successful for UID {data.uid}")
     return RegisterOut(token=token)
-
 
 @app.post("/confirm")
 async def confirm(req: Request, data: ConfirmIn) -> dict[str, str]:
     ip = _client_ip(req)
     user_agent = req.headers.get("user-agent")
     logger.info(f"Confirmation request for UID {data.uid} from IP {ip}")
-    logger.debug(f"Confirmation payload: {data.payload}")
-    
+
+    # --- ШАГ 1: Получить геоданные по IP ---
+    geo_data = await get_geo_data_from_ip(ip)
+    if not geo_data:
+        # --- КРИТИЧЕСКОЕ ИЗМЕНЕНИЕ ---
+        logger.warning(f"Failed to resolve location for IP {ip} during confirmation for UID {data.uid}. Returning error to client.")
+        raise HTTPException(status_code=400, detail="location_resolution_failed")
+
+    # --- ШАГ 2: Добавить геоданные к payload ---
+    data.payload.update(geo_data)
+    logger.debug(f"Final payload with geo data for UID {data.uid}")
+
     try:
         await storage.confirm(
             uid=data.uid,
@@ -141,7 +192,15 @@ async def confirm(req: Request, data: ConfirmIn) -> dict[str, str]:
             ip=ip,
             user_agent=user_agent,
         )
-        logger.info(f"Confirmation successful for UID {data.uid}")
+        logger.info(f"Confirmation successful for UID {data.uid}, including geo data.")
+        # --- УБРАНО: Вызов notify_admin --- Сервер больше не отправляет уведомления
+        # if bot_for_notification and admin_id_for_notification:
+        #     participant = await storage.get_participant(data.uid)
+        #     if participant:
+        #         active_contest_id = await storage.get_active_contest_id()
+        #         if participant.contest_id == active_contest_id:
+        #             asyncio.create_task(notify_admin_on_new_submission_internal(...))
+
     except ValueError as e:
         code = str(e)
         logger.warning(f"Confirmation failed for UID {data.uid} due to: {code}")
@@ -151,26 +210,30 @@ async def confirm(req: Request, data: ConfirmIn) -> dict[str, str]:
     except Exception as e:
         logger.error(f"Unexpected error during confirmation for UID {data.uid}: {e}")
         raise HTTPException(status_code=500, detail="internal_error")
-    
-    return {"status": "ok"}
 
+    return {"status": "ok_with_geo"}
 
-@app.get("/pending")
+# --- УБРАНА ВНУТРЕННЯЯ ФУНКЦИЯ УВЕДОМЛЕНИЯ ---
+# async def notify_admin_on_new_submission_internal(...):
+#     ...
+
+# --- Импорты для кнопок (не нужны здесь) ---
+# from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+
+@app.get("/pending") # Опционально, если используется как резерв
 async def pending(limit: int = 10, _: None = Depends(require_api_key)) -> dict[str, Any]:
     logger.info(f"Pending list requested with limit {limit}")
     items = await storage.pending(limit=int(limit))
     logger.info(f"Returning {len(items)} pending items")
     return {"items": items}
 
-
 @app.post("/decision")
 async def decision(data: DecisionIn, _: None = Depends(require_api_key)) -> dict[str, Any]:
     admin_id = int(data.admin_id or 0)
     if admin_id <= 0:
-        # keep it optional, but encourage sending
         admin_id = -1
     logger.info(f"Decision request received for UID {data.uid} by admin {admin_id}, action: {data.action}")
-    
+
     try:
         p = await storage.decide(uid=data.uid, action=data.action, admin_id=admin_id, note=data.note)
         logger.info(f"Decision '{data.action}' applied successfully for UID {data.uid}")
@@ -193,10 +256,10 @@ async def decision(data: DecisionIn, _: None = Depends(require_api_key)) -> dict
             "status": p.status,
             "decision": p.decision,
             "decided_at": p.decided_at,
-            "decision_note": p.decision_note,
+            "decision_note": p.decition_note,
+            "contest_id": p.contest_id,
         },
     }
-
 
 @app.post("/reset")
 async def reset(_: None = Depends(require_api_key)) -> dict[str, str]:
@@ -205,11 +268,8 @@ async def reset(_: None = Depends(require_api_key)) -> dict[str, str]:
     logger.info("Database reset completed")
     return {"status": "ok"}
 
-
 if __name__ == "__main__":
-    # Railway sets PORT; default for local dev.
     import uvicorn
-
     port = int(os.getenv("PORT", "8000"))
     logger.info(f"Starting server on port {port}")
     uvicorn.run("server:app", host="0.0.0.0", port=port, reload=False)
