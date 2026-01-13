@@ -289,9 +289,10 @@ class Storage:
             )
             await db.commit()
 
+    # --- ИСПРАВЛЕННЫЙ МЕТОД pending ---
     async def pending(self, *, limit: int = 10) -> list[dict[str, Any]]:
         """Return latest pending submissions (awaiting approval for current contest)."""
-        await self.init()
+        await self.init() # Инициализация storage при первом вызове метода
         active_contest_id = await self.get_active_contest_id()
         if not active_contest_id:
              print("WARNING: No active contest found for pending list.")
