@@ -174,12 +174,11 @@ async def confirm(req: Request, data: ConfirmIn) -> dict[str, str]:
     logger.info(f"Confirmation request for UID {data.uid} from IP {ip}")
 
     # --- ШАГ 1: Получить геоданные по IP ---
-    geo_data = await get_geo_data_from_ip(ip)
-    if not geo_
-        # --- КРИТИЧЕСКОЕ ИЗМЕНЕНИЕ ---
-        logger.warning(f"Failed to resolve location for IP {ip} during confirmation for UID {data.uid}. Returning error to client.")
-        raise HTTPException(status_code=400, detail="location_resolution_failed")
-
+geo_data = await get_geo_data_from_ip(ip)
+if not geo_data: # <-- Добавлено двоеточие
+    # --- КРИТИЧЕСКОЕ ИЗМЕНЕНИЕ ---
+    logger.warning(f"Failed to resolve location for IP {ip} during confirmation for UID {data.uid}. Returning error to client.")
+    raise HTTPException(status_code=400, detail="location_resolution_failed")
     # --- ШАГ 2: Добавить геоданные к payload ---
     data.payload.update(geo_data)
     logger.debug(f"Final payload with geo data for UID {data.uid}")
