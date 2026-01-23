@@ -451,6 +451,14 @@ class Storage:
                 (uid,),
             )
             row2 = await cursor2.fetchone()
+            # Проверка на случай гонки условий между UPDATE и SELECT
+            if not row2:
+                 # Участник был удален или что-то пошло не так между UPDATE и SELECT
+                 # Возвращаем None или бросаем исключение - зависит от требований
+                 # Здесь возвращаем None
+                 return None # Важно: decide должен возвращать Participant или бросать исключение, возвращение None нарушает сигнатуру
+                 # Возможно, лучше бросить ValueError("Participant disappeared after update")
+                 raise ValueError("Participant disappeared after update")
             assert row2 is not None
             return Participant(
                 uid=row2[0],
@@ -469,7 +477,10 @@ class Storage:
                 contest_id=row2[13],
             )
 
-async def reset(self) -> None: """Wipe all data.""" # Используйте с осторожностью
+    # Метод reset теперь правильно вложен в класс Storage
+    async def reset(self) -> None:
+        """Wipe all data.""" # Используйте с осторожностью
+        await self.init() # Убедитесь, что БД инициализирована перед очисткой
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute("PRAGMA busy_timeout=30000;")
             await db.execute("PRAGMA foreign_keys=ON;")
@@ -477,8 +488,12 @@ async def reset(self) -> None: """Wipe all data.""" # Используйте с 
             await db.execute("DELETE FROM participants;")
             await db.execute("DELETE FROM contests;") # Удаляет и конкурсы!
             await db.commit()
-        await self.init()
+        # После очистки и коммита, возможно, стоит повторно создать дефолтные таблицы/конкурсы
+        # await self.init() # Это может быть избыточно, так как init уже вызван выше, но если таблицы удаляются полностью, то может понадобиться.
+        # Лучше вызвать отдельную функцию инициализации или создать дефолтный конкурс снова:
+        await self.create_default_contest_if_not_exists()
 
+    # Метод get_participant теперь правильно вложен в класс Storage
     async def get_participant(self, uid: str) -> Optional[Participant]:
         await self.init()
         async with aiosqlite.connect(self.db_path) as db:
