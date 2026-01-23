@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Comet Contest Registration</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 0; 
+            padding: 0;
+            background-color: #000; /* Черный фон на случай, если GIF не загрузился */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden; /* Убираем скроллы */
+        }
+
+        .container { 
+            position: relative;
+            z-index: 1; /* Контейнер поверх фона */
+            width: 90%;
+            max-width: 600px; 
+            padding: 30px; 
+            background-color: rgba(0, 0, 0, 0.7); /* Полупрозрачный черный фон для контейнера */
+            border-radius: 15px; 
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            color: white; /* Белый текст по умолчанию */
+            backdrop-filter: blur(10px); /* Размытие фона за контейнером (если браузер поддерживает) */
+        }
+
+        h1 { 
+            text-align: center; 
+            color: white; 
+            margin-bottom: 30px;
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .user-info { 
+            background-color: rgba(255, 255, 255, 0.1); 
+            padding: 15px; 
+            border-radius: 8px; 
+            margin-bottom: 25px; 
+            border-left: 4px solid #ffffff;
+            font-size: 14px;
+        }
+
+        .form-group { 
+            margin-bottom: 25px; 
+        }
+
+        label { 
+            display: block; 
+            margin-bottom: 8px; 
+            font-weight: bold; 
+            font-size: 16px;
+            color: #ffffff;
+        }
+
+        input[type="text"] { 
+            width: 100%; 
+            padding: 12px; 
+            border: 1px solid #444; 
+            border-radius: 8px; 
+            background-color: rgba(255, 255, 255, 0.1); 
+            color: white; 
+            font-size: 16px;
+            box-sizing: border-box;
+            transition: border-color 0.3s;
+        }
+
+        input[type="text"]:focus { 
+            outline: none; 
+            border-color: #bb86fc; /* Фиолетовый при фокусе */
+        }
+
+        input::placeholder {
+            color: #aaaaaa;
+            opacity: 1;
+        }
+
+        button { 
+            width: 100%; 
+            padding: 15px 20px; 
+            font-size: 18px; 
+            font-weight: bold;
+            background: linear-gradient(145deg, #6a0dad, #9c27b0); /* Градиент фиолетового цвета */
+            color: white; 
+            border: none; 
+            border-radius: 10px; 
+            cursor: pointer; 
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+
+        button:hover { 
+            transform: translateY(-2px); /* Поднимаем кнопку при наведении */
+            box-shadow: 0 6px 15px rgba(156, 39, 176, 0.5); /* Ярче тень */
+            background: linear-gradient(145deg, #8e24aa, #ba68c8); /* Более светлый градиент */
+        }
+
+        button:disabled { 
+            background: linear-gradient(145deg, #4a0080, #7b1fa2); /* Темнее при disabled */
+            cursor: not-allowed; 
+            transform: none;
+            box-shadow: none;
+        }
+
+        .status { 
+            margin-top: 20px; 
+            padding: 12px; 
+            border-radius: 8px; 
+            text-align: center;
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        .success { 
+            background-color: #4caf50; 
+            color: white; 
+        }
+
+        .error { 
+            background-color: #f44336; 
+            color: white; 
+        }
+
+        /* Фоновое видео (GIF) */
+        .background-video {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0; /* На заднем плане */
+            object-fit: cover; /* Заполняет весь экран */
+            animation: fadeIn 1s ease-in-out; /* Анимация появления */
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        /* Эффект подсветки при наведении (для кнопки, но можно добавить и для других элементов) */
+        .glow-effect {
+            animation: glow 1s ease-in-out infinite alternate;
+        }
+
+        @keyframes glow {
+            from { box-shadow: 0 0 5px rgba(186, 104, 200, 0.5); }
+            to { box-shadow: 0 0 15px rgba(186, 104, 200, 0.8); }
+        }
+
+        /* Для анимации кнопки при наведении */
+        button:hover {
+            animation: pulse 0.5s ease-in-out;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        /* Мобильная адаптация */
+        @media (max-width: 768px) {
+            .container {
+                width: 95%;
+                padding: 20px;
+            }
+            h1 {
+                font-size: 20px;
+            }
+            button {
+                padding: 12px 15px;
+                font-size: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Фоновое видео (GIF) -->
+    <img class="background-video" src="duck.gif" alt="Background Animation">
+
+    <div class="container">
+        <h1>Проверка данных участника</h1>
+
+        <div id="userInfo" class="user-info">
+            <p><strong>Loading user info...</strong></p>
+        </div>
+
+        <!-- Форма для ввода данных -->
+        <form id="registrationForm">
+            <div class="form-group">
+                <label for="regionInput">Регион вашего VPN</label>
+                <input type="text" id="regionInput" placeholder="Введите название страны (Нидерланды)" required>
+            </div>
+            <div class="form-group">
+                <label for="timeInput">Время, в которое вы сделали первый запрос в Comet</label>
+                <input type="text" id="timeInput" placeholder="Введите время вашего первого запроса в формате (17:00)" required>
+            </div>
+            <button type="submit" id="registerBtn">Подтвердить участие</button>
+        </form>
+
+        <div id="statusMessage" class="status" style="display: none;"></div>
+    </div>
+
+    <script src="webapp.js"></script>
+</body>
+</html>
