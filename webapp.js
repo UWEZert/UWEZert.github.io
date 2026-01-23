@@ -5,41 +5,59 @@ Telegram.WebApp.ready();
 const user = Telegram.WebApp.initDataUnsafe?.user;
 
 if (!user) {
-    document.getElementById('info').innerHTML = '<p style="color: red;">Error: Cannot get user data from Telegram.</p>';
+    document.getElementById('userInfo').innerHTML = '<p style="color: red;">Error: Cannot get user data from Telegram.</p>';
     Telegram.WebApp.close();
-    // Or handle error differently
 } else {
-    document.getElementById('info').innerHTML = `
-        <p><strong>ID:</strong> ${user.id}</p>
+    document.getElementById('userInfo').innerHTML = `
+        <p><strong>Telegram ID:</strong> ${user.id}</p>
         <p><strong>Username:</strong> @${user.username || 'N/A'}</p>
-        <p><strong>Name:</strong> ${user.first_name} ${user.last_name || ''}</p>
-        <p><strong>Is Bot Admin:</strong> ${user.is_premium || false}</p>
+        <p><strong>First Name:</strong> ${user.first_name}</p>
+        <p><strong>Last Name:</strong> ${user.last_name || ''}</p>
     `;
 }
 
-document.getElementById('registerBtn').addEventListener('click', async () => {
+// Обработчик отправки формы
+document.getElementById('registrationForm').addEventListener('submit', async (event) => {
+    event.preventDefault();
+
     const button = document.getElementById('registerBtn');
     const statusDiv = document.getElementById('statusMessage');
+    const regionInput = document.getElementById('regionInput');
+    const timeInput = document.getElementById('timeInput');
+
+    // Валидация полей (простая)
+    if (!regionInput.value.trim() || !timeInput.value.trim()) {
+        statusDiv.className = 'status error';
+        statusDiv.textContent = 'Пожалуйста, заполните все поля.';
+        statusDiv.style.display = 'block';
+        return;
+    }
 
     button.disabled = true;
-    button.textContent = 'Processing...';
+    button.innerHTML = '<span class="loading-spinner"></span> Обработка...';
     statusDiv.style.display = 'none';
 
     try {
-        // Prepare data to send to server
+        // Собираем данные, включая информацию от пользователя
         const userData = {
-            uid: user.id.toString(), // Ensure string
+            uid: user.id.toString(),
             user_id: user.id,
-            chat_id: user.id, // Often same as user_id for PM
+            chat_id: user.id,
             username: user.username || null,
             first_name: user.first_name,
             last_name: user.last_name || null,
-            ip: null, // IP is usually determined server-side, not sent from client
-            // Include initData for server-side validation
-            telegram_init_data: Telegram.WebApp.initData
+            ip: null,
+            telegram_init_ Telegram.WebApp.initData,
+            // Данные из формы, которые нужно сохранить отдельно
+            user_provided_data: {
+                region: regionInput.value.trim(),
+                first_request_time: timeInput.value.trim(),
+                source: "WebApp"
+            }
         };
 
-        // Send registration request
+        console.log("Sending registration data:", userData);
+
         const response = await fetch('/api/register_from_webapp', {
             method: 'POST',
             headers: {
@@ -49,17 +67,25 @@ document.getElementById('registerBtn').addEventListener('click', async () => {
         });
 
         if (!response.ok) {
-            throw new Error(`Server error: ${response.status}`);
+            let errorMessage = `Ошибка сервера: ${response.status}`;
+            try {
+                const errorJson = await response.json();
+                if (errorJson.detail) {
+                    errorMessage = errorJson.detail;
+                }
+            } catch (e) {
+                console.warn("Could not parse error response as JSON:", e);
+            }
+            throw new Error(errorMessage);
         }
 
         const result = await response.json();
         console.log(result);
 
         statusDiv.className = 'status success';
-        statusDiv.textContent = result.message || 'Successfully registered!';
+        statusDiv.textContent = result.message || 'Участие успешно подтверждено!';
         statusDiv.style.display = 'block';
 
-        // Optionally close the web app after success
         setTimeout(() => {
             Telegram.WebApp.close();
         }, 2000);
@@ -67,10 +93,25 @@ document.getElementById('registerBtn').addEventListener('click', async () => {
     } catch (error) {
         console.error('Registration failed:', error);
         statusDiv.className = 'status error';
-        statusDiv.textContent = `Registration failed: ${error.message}`;
+        statusDiv.textContent = `Ошибка: ${error.message}`;
         statusDiv.style.display = 'block';
     } finally {
         button.disabled = false;
-        button.textContent = 'Register Now';
+        button.textContent = 'Подтвердить участие';
     }
+});
+
+// Добавляем эффект подсветки при наведении на кнопку (альтернативный способ)
+document.getElementById('registerBtn').addEventListener('mouseenter', function() {
+    this.classList.add('glow-effect');
+});
+
+document.getElementById('registerBtn').addEventListener('mouseleave', function() {
+    this.classList.remove('glow-effect');
+});
+
+// Настройка кнопки "Back"
+Telegram.WebApp.BackButton.show();
+Telegram.WebApp.onEvent("back_button_pressed", () => {
+    Telegram.WebApp.close();
 });
