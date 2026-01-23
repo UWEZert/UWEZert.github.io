@@ -469,8 +469,8 @@ class Storage:
                 contest_id=row2[13],
             )
 
-    async def reset(self) -> None: """Wipe all data.""" # Используйте с осторожностью
-        await self.init()
+ py
+async def reset(self) -> None: """Wipe all data.""" # Используйте с осторожностью
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute("PRAGMA busy_timeout=30000;")
             await db.execute("PRAGMA foreign_keys=ON;")
@@ -478,6 +478,7 @@ class Storage:
             await db.execute("DELETE FROM participants;")
             await db.execute("DELETE FROM contests;") # Удаляет и конкурсы!
             await db.commit()
+        await self.init()
 
     async def get_participant(self, uid: str) -> Optional[Participant]:
         await self.init()
