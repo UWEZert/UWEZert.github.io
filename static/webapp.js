@@ -58,7 +58,9 @@ document.getElementById('registrationForm').addEventListener('submit', async (ev
 
         console.log("Sending registration data:", userData);
 
-        const response = await fetch('/api/register_from_webapp', {
+       // Получаем базовый URL из текущего местоположения (если WebApp размещён вместе с API)
+        const baseUrl = window.location.origin; // Это даст вам https://yourdomain.up.railway.app
+        const response = await fetch(`${baseUrl}/api/register_from_webapp`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
