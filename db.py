@@ -469,7 +469,6 @@ class Storage:
                 contest_id=row2[13],
             )
 
- py
 async def reset(self) -> None: """Wipe all data.""" # Используйте с осторожностью
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute("PRAGMA busy_timeout=30000;")
