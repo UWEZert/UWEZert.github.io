@@ -10,7 +10,8 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from db import Storage
+# Импорт Storage закомментирован, так как мы его не используем в /register
+# from db import Storage
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -19,14 +20,15 @@ logger = logging.getLogger(__name__)
 # Load .env for local development. Railway uses env vars directly, so this is safe.
 load_dotenv()
 
-DB_PATH = os.getenv("DB_PATH", "data/app.db")
-BACKEND_API_KEY = os.getenv("BACKEND_API_KEY", "")
+# Эти переменные пока не используются в упрощённом /register
+# DB_PATH = os.getenv("DB_PATH", "data/app.db")
+# BACKEND_API_KEY = os.getenv("BACKEND_API_KEY", "")
 
 # Comma-separated list of allowed origins for the static page
 # Example: "https://uwezert.github.io ,https://uwezert.github.io/ "
 CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "*").split(",") if o.strip()]
 
-app = FastAPI(title="UWEZert Verification Backend")
+app = FastAPI(title="UWEZert Verification Backend (Simplified Register)")
 
 if CORS_ORIGINS == ["*"]:
     app.add_middleware(
@@ -45,9 +47,9 @@ else:
         allow_headers=["*"],
     )
 
-storage = Storage(DB_PATH)
+# storage = Storage(DB_PATH) # Закомментировано
 
-
+# Функция _client_ip и require_api_key остаются, но не используются в упрощённом /register
 def _client_ip(req: Request) -> Optional[str]:
     # Railway sits behind a proxy; X-Forwarded-For is typically set.
     xff = req.headers.get("x-forwarded-for")
@@ -57,6 +59,7 @@ def _client_ip(req: Request) -> Optional[str]:
 
 
 async def require_api_key(x_api_key: Optional[str] = Header(default=None)) -> None:
+    BACKEND_API_KEY = os.getenv("BACKEND_API_KEY", "")
     if not BACKEND_API_KEY:
         raise HTTPException(status_code=500, detail="BACKEND_API_KEY not set")
     if not x_api_key or x_api_key != BACKEND_API_KEY:
@@ -92,120 +95,53 @@ class DecisionIn(BaseModel):
 
 @app.get("/health")
 async def health() -> dict[str, str]:
-    await storage.init()
+    # storage.init() # Не вызываем, так как storage не используется
     return {"status": "ok"}
 
 
 @app.post("/register", response_model=RegisterOut)
 async def register(req: Request, data: RegisterIn) -> RegisterOut:
-    # --- Логирование для отладки ---
+    # --- Логирование получения запроса ---
     logger.info(f"Received POST request to /register from {req.client.host}")
-    try:
-        body_bytes = await req.body()
-        logger.info(f"Request body (raw bytes): {body_bytes[:200]}...") # Логируем первые 200 байт тела
-    except Exception as e:
-        logger.error(f"Failed to read raw request body: {e}")
-        # Продолжаем, так как FastAPI уже прочитал тело для валидации Pydantic
-    # ------------------------------
+    logger.info(f"Request data received (will be ignored): {data.dict()}")
+    # --------------------------------------
 
-    # Логика обработки остается прежней, но оборачиваем в try-except для отлова ошибок в storage.register
-    try:
-        token = await storage.register(
-            uid=data.uid,
-            user_id=data.user_id,
-            chat_id=data.chat_id,
-            username=data.username,
-            first_name=data.first_name,
-            last_name=data.last_name,
-            ip=_client_ip(req),
-        )
-        logger.info(f"Registration successful for UID: {data.uid}, returning token.")
-        return RegisterOut(token=token)
-    except Exception as e:
-        logger.error(f"Error during registration for UID {data.uid}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal Server Error during registration")
+    # Всегда возвращаем один и тот же тестовый токен
+    test_token = "test_token_12345"
+    logger.info(f"Returning fixed test token: {test_token}")
+    return RegisterOut(token=test_token)
 
+
+# Остальные эндпоинты (confirm, pending, decision, reset) оставим как есть,
+# но они будут вызывать ошибку, так как storage не инициализирован.
+# Если бот их не вызывает, это не страшно для теста /register.
+# Если вызывает - можно аналогично упростить или закомментировать.
 
 @app.post("/confirm")
 async def confirm(req: Request, data: ConfirmIn) -> dict[str, str]:
-    logger.info(f"Received POST request to /confirm from {req.client.host}")
-    try:
-        await storage.confirm(
-            uid=data.uid,
-            token=data.token,
-            payload=data.payload,
-            ip=_client_ip(req),
-            user_agent=req.headers.get("user-agent"),
-        )
-    except ValueError as e:
-        code = str(e)
-        if code in ("unknown_uid", "bad_token"):
-            logger.warning(f"Confirm failed due to {code} for UID: {data.uid}")
-            raise HTTPException(status_code=400, detail=code)
-        logger.error(f"Unexpected ValueError during confirm for UID {data.uid}: {e}", exc_info=True)
-        raise
-    except Exception as e:
-        logger.error(f"Unexpected error during confirm for UID {data.uid}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal Server Error during confirmation")
-    logger.info(f"Confirmation successful for UID: {data.uid}")
-    return {"status": "ok"}
-
+    logger.info(f"Received POST request to /confirm from {req.client.host} (SKIPPED FOR TEST)")
+    # Заглушка, чтобы не было ошибки, если бот случайно вызовет /confirm
+    # В реальной ситуации его нужно будет раскомментировать и исправить
+    # try:
+    #     await storage.confirm(...)
+    # except ValueError as e: ...
+    return {"status": "ok (SIMULATED FOR TEST)"}
 
 @app.get("/pending")
 async def pending(limit: int = 10, _: None = Depends(require_api_key)) -> dict[str, Any]:
-    logger.info(f"Received GET request to /pending with limit={limit}")
-    try:
-        items = await storage.pending(limit=int(limit))
-        logger.info(f"Returned {len(items)} pending items.")
-        return {"items": items}
-    except Exception as e:
-        logger.error(f"Error fetching pending items: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal Server Error fetching pending items")
-
+    logger.info(f"Received GET request to /pending (SKIPPED FOR TEST)")
+    return {"items": []} # Заглушка
 
 @app.post("/decision")
 async def decision(data: DecisionIn, _: None = Depends(require_api_key)) -> dict[str, Any]:
-    logger.info(f"Received POST request to /decision for UID: {data.uid}, action: {data.action}")
-    admin_id = int(data.admin_id or 0)
-    if admin_id <= 0:
-        # keep it optional, but encourage sending
-        admin_id = -1
-    try:
-        p = await storage.decide(uid=data.uid, action=data.action, admin_id=admin_id, note=data.note)
-        logger.info(f"Decision '{data.action}' processed for UID: {data.uid}")
-        return {
-            "status": "ok",
-            "participant": {
-                "uid": p.uid,
-                "user_id": p.user_id,
-                "chat_id": p.chat_id,
-                "username": p.username,
-                "first_name": p.first_name,
-                "last_name": p.last_name,
-                "status": p.status,
-                "decision": p.decision,
-                "decided_at": p.decided_at,
-                "decision_note": p.decision_note,
-            },
-        }
-    except ValueError as e:
-        logger.warning(f"Decision failed due to {str(e)} for UID: {data.uid}")
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.error(f"Unexpected error during decision for UID {data.uid}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal Server Error processing decision")
-
+    logger.info(f"Received POST request to /decision (SKIPPED FOR TEST)")
+    # Заглушка
+    return {"status": "ok", "participant": {}} # Заглушка
 
 @app.post("/reset")
 async def reset(_: None = Depends(require_api_key)) -> dict[str, str]:
-    logger.info("Received POST request to /reset")
-    try:
-        await storage.reset()
-        logger.info("Database reset completed successfully.")
-        return {"status": "ok"}
-    except Exception as e:
-        logger.error(f"Error during database reset: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal Server Error during reset")
+    logger.info("Received POST request to /reset (SKIPPED FOR TEST)")
+    return {"status": "ok (SIMULATED FOR TEST)"}
 
 
 if __name__ == "__main__":
