@@ -25,7 +25,7 @@ document.getElementById('registrationForm').addEventListener('submit', async (ev
     const regionInput = document.getElementById('regionInput');
     const timeInput = document.getElementById('timeInput');
 
-    // Валидация полей (простая)
+    // Валидация полей
     if (!regionInput.value.trim() || !timeInput.value.trim()) {
         statusDiv.className = 'status error';
         statusDiv.textContent = 'Пожалуйста, заполните все поля.';
@@ -34,11 +34,10 @@ document.getElementById('registrationForm').addEventListener('submit', async (ev
     }
 
     button.disabled = true;
-    button.innerHTML = '<span class="loading-spinner"></span> Обработка...';
+    button.innerHTML = 'Обработка...';
     statusDiv.style.display = 'none';
 
     try {
-        // Собираем данные, включая информацию от пользователя
         const userData = {
             uid: user.id.toString(),
             user_id: user.id,
@@ -47,8 +46,7 @@ document.getElementById('registrationForm').addEventListener('submit', async (ev
             first_name: user.first_name,
             last_name: user.last_name || null,
             ip: null,
-            telegram_init_ Telegram.WebApp.initData,
-            // Данные из формы, которые нужно сохранить отдельно
+            telegram_init_data: Telegram.WebApp.initData, // Исправлено: было `telegram_init_ Telegram.WebApp.initData`
             user_provided_data: {
                 region: regionInput.value.trim(),
                 first_request_time: timeInput.value.trim(),
@@ -58,8 +56,8 @@ document.getElementById('registrationForm').addEventListener('submit', async (ev
 
         console.log("Sending registration data:", userData);
 
-       // Получаем базовый URL из текущего местоположения (если WebApp размещён вместе с API)
-        const baseUrl = window.location.origin; // Это даст вам https://yourdomain.up.railway.app
+        // Используем window.location.origin для API (как и раньше)
+        const baseUrl = window.location.origin;
         const response = await fetch(`${baseUrl}/api/register_from_webapp`, {
             method: 'POST',
             headers: {
@@ -72,9 +70,7 @@ document.getElementById('registrationForm').addEventListener('submit', async (ev
             let errorMessage = `Ошибка сервера: ${response.status}`;
             try {
                 const errorJson = await response.json();
-                if (errorJson.detail) {
-                    errorMessage = errorJson.detail;
-                }
+                errorMessage = errorJson.detail || errorMessage;
             } catch (e) {
                 console.warn("Could not parse error response as JSON:", e);
             }
@@ -82,7 +78,7 @@ document.getElementById('registrationForm').addEventListener('submit', async (ev
         }
 
         const result = await response.json();
-        console.log(result);
+        console.log("Server response:", result);
 
         statusDiv.className = 'status success';
         statusDiv.textContent = result.message || 'Участие успешно подтверждено!';
@@ -95,21 +91,12 @@ document.getElementById('registrationForm').addEventListener('submit', async (ev
     } catch (error) {
         console.error('Registration failed:', error);
         statusDiv.className = 'status error';
-        statusDiv.textContent = `Ошибка: ${error.message}`;
+        statusDiv.textContent = `Ошибка: ${error.message || 'Неизвестная ошибка'}`;
         statusDiv.style.display = 'block';
     } finally {
         button.disabled = false;
         button.textContent = 'Подтвердить участие';
     }
-});
-
-// Добавляем эффект подсветки при наведении на кнопку (альтернативный способ)
-document.getElementById('registerBtn').addEventListener('mouseenter', function() {
-    this.classList.add('glow-effect');
-});
-
-document.getElementById('registerBtn').addEventListener('mouseleave', function() {
-    this.classList.remove('glow-effect');
 });
 
 // Настройка кнопки "Back"
