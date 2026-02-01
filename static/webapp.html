@@ -9,41 +9,62 @@
             font-family: Arial, sans-serif; 
             margin: 0; 
             padding: 0;
-            background-color: #000; /* Черный фон на случай, если GIF не загрузился */
+            background-color: #000; /* Черный фон */
             display: flex;
             justify-content: center;
             align-items: center;
             min-height: 100vh;
-            overflow: hidden; /* Убираем скроллы */
+            overflow: hidden;
+            position: relative; /* Для позиционирования фона */
         }
 
+        /* Фоновая уточка — центрированная, масштабированная под размер */
+        .background-duck {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: auto;
+            height: auto;
+            max-width: 90vw;
+            max-height: 70vh;
+            z-index: 0;
+            animation: fadeIn 1s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        /* Контейнер поверх уточки */
         .container { 
             position: relative;
-            z-index: 1; /* Контейнер поверх фона */
+            z-index: 1;
             width: 90%;
             max-width: 600px; 
             padding: 30px; 
-            background-color: rgba(0, 0, 0, 0.7); /* Полупрозрачный черный фон для контейнера */
+            background-color: rgba(0, 0, 0, 0.75); /* Более плотный полупрозрачный черный */
             border-radius: 15px; 
-            box-shadow: 0 0 20px rgba(0,0,0,0.5);
-            color: white; /* Белый текст по умолчанию */
-            backdrop-filter: blur(10px); /* Размытие фона за контейнером (если браузер поддерживает) */
+            box-shadow: 0 0 25px rgba(0,0,0,0.6);
+            color: white;
+            backdrop-filter: blur(12px);
         }
 
         h1 { 
             text-align: center; 
             color: white; 
-            margin-bottom: 30px;
+            margin-bottom: 25px;
             font-size: 24px;
             font-weight: bold;
         }
 
         .user-info { 
-            background-color: rgba(255, 255, 255, 0.1); 
+            background-color: rgba(255, 255, 255, 0.08); 
             padding: 15px; 
             border-radius: 8px; 
             margin-bottom: 25px; 
-            border-left: 4px solid #ffffff;
+            border-left: 4px solid #bb86fc;
             font-size: 14px;
         }
 
@@ -73,7 +94,7 @@
 
         input[type="text"]:focus { 
             outline: none; 
-            border-color: #bb86fc; /* Фиолетовый при фокусе */
+            border-color: #bb86fc;
         }
 
         input::placeholder {
@@ -81,28 +102,29 @@
             opacity: 1;
         }
 
+        /* --- ОБНОВЛЁННЫЕ КНОПКИ: темно-фиолетовые, белый текст --- */
         button { 
             width: 100%; 
-            padding: 15px 20px; 
+            padding: 16px 20px; 
             font-size: 18px; 
             font-weight: bold;
-            background: linear-gradient(145deg, #6a0dad, #9c27b0); /* Градиент фиолетового цвета */
+            background: linear-gradient(145deg, #4a154b, #6a1fa1); /* Темно-фиолетовый градиент */
             color: white; 
             border: none; 
             border-radius: 10px; 
             cursor: pointer; 
             transition: all 0.3s ease;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 12px rgba(74, 21, 75, 0.4);
         }
 
         button:hover { 
-            transform: translateY(-2px); /* Поднимаем кнопку при наведении */
-            box-shadow: 0 6px 15px rgba(156, 39, 176, 0.5); /* Ярче тень */
-            background: linear-gradient(145deg, #8e24aa, #ba68c8); /* Более светлый градиент */
+            transform: translateY(-2px);
+            box-shadow: 0 6px 18px rgba(106, 31, 161, 0.6);
+            background: linear-gradient(145deg, #5a1e5d, #7a2ab1);
         }
 
         button:disabled { 
-            background: linear-gradient(145deg, #4a0080, #7b1fa2); /* Темнее при disabled */
+            background: linear-gradient(145deg, #33103c, #4a154b);
             cursor: not-allowed; 
             transform: none;
             box-shadow: none;
@@ -118,51 +140,13 @@
         }
 
         .success { 
-            background-color: #4caf50; 
+            background-color: #2e7d32; 
             color: white; 
         }
 
         .error { 
-            background-color: #f44336; 
+            background-color: #c62828; 
             color: white; 
-        }
-
-        /* Фоновое видео (GIF) */
-        .background-video {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 0; /* На заднем плане */
-            object-fit: cover; /* Заполняет весь экран */
-            animation: fadeIn 1s ease-in-out; /* Анимация появления */
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-
-        /* Эффект подсветки при наведении (для кнопки, но можно добавить и для других элементов) */
-        .glow-effect {
-            animation: glow 1s ease-in-out infinite alternate;
-        }
-
-        @keyframes glow {
-            from { box-shadow: 0 0 5px rgba(186, 104, 200, 0.5); }
-            to { box-shadow: 0 0 15px rgba(186, 104, 200, 0.8); }
-        }
-
-        /* Для анимации кнопки при наведении */
-        button:hover {
-            animation: pulse 0.5s ease-in-out;
-        }
-
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-            100% { transform: scale(1); }
         }
 
         /* Мобильная адаптация */
@@ -178,13 +162,17 @@
                 padding: 12px 15px;
                 font-size: 16px;
             }
+            .background-duck {
+                max-width: 85vw;
+                max-height: 65vh;
+            }
         }
     </style>
 </head>
 <body>
 
-    <!-- Фоновое видео (GIF) -->
-    <img class="background-video" src="duck.gif" alt="Background Animation">
+    <!-- Центрированная уточка как фон -->
+    <img class="background-duck" src="duck.gif" alt="Duck with laptop">
 
     <div class="container">
         <h1>Проверка данных участника</h1>
