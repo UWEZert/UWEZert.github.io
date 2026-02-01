@@ -7,14 +7,13 @@ import secrets
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Optional
+import logging
 
 import aiosqlite
-import logging # Добавляем импорт logging
 
-# Настройка логирования (лучше поместить это в начало файла или в ваш server.py)
+# Настройка логирования
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__) # Создаем логгер для этого файла
-
+logger = logging.getLogger(__name__)
 
 def utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -43,12 +42,12 @@ class Storage:
 
     def __init__(self, db_path: str) -> None:
         self.db_path = db_path
-        logger.info(f"Storage initialized with DB path: {self.db_path}") # Логируем путь
+        logger.info(f"Storage initialized with DB path: {self.db_path}")
         db_dir = os.path.dirname(self.db_path) or "."
-        logger.info(f"DB directory: {db_dir}") # Логируем директорию
-        os.makedirs(db_dir, exist_ok=True) # Создаем директорию, если её нет
-        logger.info(f"DB directory exists: {os.path.exists(db_dir)}") # Проверяем существование
-        logger.info(f"DB directory is writable: {os.access(db_dir, os.W_OK)}") # Проверяем права на запись
+        logger.info(f"DB directory: {db_dir}")
+        os.makedirs(db_dir, exist_ok=True)
+        logger.info(f"DB directory exists: {os.path.exists(db_dir)}")
+        logger.info(f"DB directory is writable: {os.access(db_dir, os.W_OK)}")
         self._init_lock = aiosqlite.Connection  # type: ignore
         self._initialized = False
         self._init_guard = None
@@ -62,10 +61,10 @@ class Storage:
         await self._ensure_init_guard()
         async with self._init_guard:  # type: ignore
             if self._initialized:
-                logger.debug("Storage already initialized, skipping init.") # Отладочный лог
+                logger.debug("Storage already initialized, skipping init.")
                 return
 
-            logger.info(f"Initializing database at: {self.db_path}") # Информационный лог
+            logger.info(f"Initializing database at: {self.db_path}")
             try:
                 async with aiosqlite.connect(self.db_path) as db:
                     await db.execute("PRAGMA journal_mode=WAL;")
@@ -138,19 +137,51 @@ class Storage:
                     )
 
                     await db.commit()
-                    logger.info("Database tables initialized successfully.") # Информационный лог
+                    logger.info("Database tables initialized successfully.")
 
                 self._initialized = True
-                logger.info("Storage initialization completed successfully.") # Информационный лог
+                logger.info("Storage initialization completed successfully.")
             except Exception as e:
-                logger.error(f"Failed to initialize database at {self.db_path}: {e}", exc_info=True) # Логируем ошибку с traceback
+                logger.error(f"Failed to initialize database at {self.db_path}: {e}", exc_info=True)
                 raise # Перебрасываем исключение, чтобы сервер знал, что инициализация провалилась
 
-    # ... (остальные методы остаются без изменений, но можно добавить логирование и туда для отладки)
-    # ... (скопируйте остальную часть кода из предыдущей версии db.py, которую я дал, включая методы reset и get_participant)
+    async def create_default_contest_if_not_exists(self):
+        """Создает дефолтный конкурс, если он не существует."""
+        await self.init()
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute("INSERT OR IGNORE INTO contests (name, is_active) VALUES (?, 1)", ("Default Contest",))
+            await db.commit()
 
-    # --- Все остальные методы остаются без изменений, за исключением возможного добавления логирования ---
-    # (Пример добавления логирования в register)
+    async def create_contest(self, name: str) -> int:
+        """Создает новый конкурс и делает его активным."""
+        await self.init()
+        async with aiosqlite.connect(self.db_path) as db:
+            # Деактивировать текущий активный конкурс
+            await db.execute("UPDATE contests SET is_active = 0 WHERE is_active = 1")
+            # Создать новый активный конкурс
+            await db.execute("INSERT INTO contests (name, is_active) VALUES (?, 1)", (name,))
+            cursor = await db.execute("SELECT last_insert_rowid()")
+            new_contest_id = (await cursor.fetchone())[0]
+            await db.commit()
+            print(f"INFO: New contest '{name}' (ID: {new_contest_id}) created and activated.")
+            return new_contest_id
+
+    async def get_active_contest_id(self) -> Optional[int]:
+        """Возвращает ID активного конкурса."""
+        await self.init()
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute("SELECT id FROM contests WHERE is_active = 1 LIMIT 1")
+            row = await cursor.fetchone()
+            return row[0] if row else None
+
+    async def get_all_contests(self) -> list[dict[str, Any]]:
+        """Возвращает список всех конкурсов."""
+        await self.init()
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute("SELECT id, name, created_at, is_active FROM contests ORDER BY created_at DESC")
+            rows = await cursor.fetchall()
+            return [{"id": r[0], "name": r[1], "created_at": r[2], "is_active": bool(r[3])} for r in rows]
+
     async def register(
         self,
         *,
@@ -163,7 +194,7 @@ class Storage:
         ip: Optional[str],
     ) -> str:
         """Create/update participant and return confirmation token. Idempotent."""
-        logger.debug(f"Register called for UID: {uid}") # Добавляем отладочный лог
+        logger.debug(f"Register called for UID: {uid}")
         await self.init()
         active_contest_id = await self.get_active_contest_id()
         if not active_contest_id:
@@ -215,10 +246,175 @@ class Storage:
             logger.info(f"New participant registered: UID={uid}, User_ID={user_id}, Chat_ID={chat_id}")
             return token
 
-    # ... (повторите аналогичное добавление логирования в другие методы, если потребуется)
+    async def confirm(
+        self,
+        *,
+        uid: str,
+        token: str,
+        payload: dict[str, Any],
+        ip: Optional[str],
+        user_agent: Optional[str],
+    ) -> None:
+        """Store a submission and mark participant as submitted. Token must match."""
+        await self.init()
 
-    # ... (остальная часть методов, включая decide, reset, get_participant и т.д., без изменений, кроме логирования)
-    # В методе decide, добавьте обработку случая, если row2 None:
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute("PRAGMA busy_timeout=30000;")
+            await db.execute("PRAGMA foreign_keys=ON;")
+
+            cursor = await db.execute(
+                "SELECT token, status, decision, contest_id FROM participants WHERE uid = ?;",
+                (uid,),
+            )
+            row = await cursor.fetchone()
+            if not row:
+                raise ValueError("unknown_uid")
+            expected_token, status, decision, contest_id = row
+            if str(expected_token) != str(token):
+                raise ValueError("bad_token")
+            if decision in ("approved", "rejected"):
+                # Already decided: still accept storing submission, but do not change status.
+                pass
+
+            received_at = utc_now_iso()
+            payload = dict(payload)
+            payload.setdefault("uid", uid)
+            payload.setdefault("received_at", received_at)
+
+            await db.execute(
+                """
+                INSERT INTO submissions (uid, received_at, ip, payload_json, user_agent)
+                VALUES (?, ?, ?, ?, ?);
+                """,
+                (
+                    uid,
+                    received_at,
+                    ip,
+                    json.dumps(payload, ensure_ascii=False),
+                    user_agent,
+                ),
+            )
+
+            # status progression: registered -> submitted_for_current_contest -> awaiting_approval -> approved/rejected
+            await db.execute(
+                """
+                UPDATE participants
+                SET status = CASE
+                    WHEN status IN ('approved','rejected') THEN status
+                    ELSE 'submitted_for_current_contest'
+                END
+                WHERE uid = ?;
+                """,
+                (uid,),
+            )
+            await db.commit()
+
+    async def pending(self, *, limit: int = 10) -> list[dict[str, Any]]:
+        """Return latest pending submissions (awaiting approval for current contest)."""
+        active_contest_id = await self.get_active_contest_id()
+        if not active_contest_id:
+             logger.warning("No active contest found for pending list.")
+             return []
+
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute("PRAGMA busy_timeout=30000;")
+            await db.execute("PRAGMA foreign_keys=ON;")
+
+            cursor = await db.execute(
+                """
+                SELECT p.uid, p.user_id, p.chat_id, p.username, p.first_name, p.last_name,
+                       p.created_at,
+                       (SELECT s.received_at FROM submissions s WHERE s.uid = p.uid ORDER BY s.id DESC LIMIT 1) AS last_received_at
+                FROM participants p
+                WHERE p.contest_id = ? AND p.status = 'awaiting_approval'
+                  AND (p.decision IS NULL OR p.decision = '')
+                ORDER BY last_received_at DESC
+                LIMIT ?;
+                """,
+                (active_contest_id, int(limit)),
+            )
+            rows = await cursor.fetchall()
+
+            out: list[dict[str, Any]] = []
+            for r in rows:
+                out.append(
+                    {
+                        "uid": r[0],
+                        "user_id": r[1],
+                        "chat_id": r[2],
+                        "username": r[3],
+                        "first_name": r[4],
+                        "last_name": r[5],
+                        "created_at": r[6],
+                        "last_received_at": r[7],
+                    }
+                )
+            return out
+
+    # --- НОВЫЙ МЕТОД ДЛЯ POLLING ---
+    async def get_uids_by_status_for_current_contest(self, status: str) -> list[str]:
+        """Возвращает список UID участников с определенным статусом в активном конкурсе."""
+        await self.init()
+        active_contest_id = await self.get_active_contest_id()
+        if not active_contest_id:
+             logger.warning(f"No active contest found for polling status '{status}'.")
+             return []
+
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute("PRAGMA busy_timeout=30000;")
+            await db.execute("PRAGMA foreign_keys=ON;")
+
+            cursor = await db.execute(
+                "SELECT uid FROM participants WHERE contest_id = ? AND status = ?;",
+                (active_contest_id, status),
+            )
+            rows = await cursor.fetchall()
+            return [row[0] for row in rows]
+
+    async def set_status_to_awaiting_approval(self, uid: str) -> Optional[Participant]:
+        """Updates participant status to awaiting_approval if possible."""
+        await self.init()
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute("PRAGMA busy_timeout=30000;")
+            await db.execute("PRAGMA foreign_keys=ON;")
+
+            # Проверяем текущий статус перед обновлением (атомарная операция)
+            cursor = await db.execute("SELECT status FROM participants WHERE uid = ? AND status = 'submitted_for_current_contest';", (uid,))
+            row = await cursor.fetchone()
+            if not row:
+                # Статус не 'submitted_for_current_contest', нельзя обновить или уже обновлен
+                return None
+
+            # Обновляем статус на 'awaiting_approval'
+            await db.execute("UPDATE participants SET status = 'awaiting_approval' WHERE uid = ? AND status = 'submitted_for_current_contest';", (uid,))
+            rows_affected = db.rowcount
+            await db.commit()
+
+            if rows_affected > 0:
+                 # Успешно обновлено, возвращаем обновленные данные
+                 return await self.get_participant(uid)
+            else:
+                 # Не обновлено (гонка), возвращаем None
+                 return None
+
+    async def get_last_submission_info(self, uid: str) -> Optional[dict[str, Any]]:
+        """Returns the most recent submission details for a participant."""
+        await self.init()
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute(
+                "SELECT received_at, ip, user_agent, payload_json FROM submissions WHERE uid = ? ORDER BY id DESC LIMIT 1",
+                (uid,)
+            )
+            row = await cursor.fetchone()
+            if row:
+                 payload_dict = {}
+                 try:
+                     payload_dict = json.loads(row[3]) # payload_json
+                 except json.JSONDecodeError:
+                     logger.warning(f"Could not decode payload JSON for UID {uid}")
+                 return {"received_at": row[0], "ip": row[1], "ua": row[2], "payload_json": payload_dict}
+            return None
+
     async def decide(
         self,
         *,
@@ -298,7 +494,7 @@ class Storage:
                 contest_id=row2[13],
             )
 
-    # ... (остальные методы, включая reset и get_participant) ...
+    # Метод reset теперь правильно вложен в класс Storage
     async def reset(self) -> None:
         """Wipe all data.""" # Используйте с осторожностью
         await self.init() # Убедитесь, что БД инициализирована перед очисткой
@@ -315,6 +511,7 @@ class Storage:
         await self.create_default_contest_if_not_exists()
         logger.info("Database reset completed.")
 
+    # Метод get_participant теперь правильно вложен в класс Storage
     async def get_participant(self, uid: str) -> Optional[Participant]:
         await self.init()
         async with aiosqlite.connect(self.db_path) as db:
@@ -343,3 +540,5 @@ class Storage:
                 decision_note=row[12],
                 contest_id=row[13],
             )
+
+# --- Конец файла ---
