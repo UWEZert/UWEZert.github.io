@@ -23,7 +23,7 @@ DB_PATH = os.getenv("DB_PATH", "data/app.db")
 BACKEND_API_KEY = os.getenv("BACKEND_API_KEY", "")
 
 # Comma-separated list of allowed origins for the static page
-# Example: "https://uwezert.github.io ,https://uwezert.github.io/ "
+# Example: "https://uwezert.github.io   ,https://uwezert.github.io/   "
 CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "*").split(",") if o.strip()]
 
 app = FastAPI(title="UWEZert Verification Backend")
@@ -218,3 +218,4 @@ if __name__ == "__main__":
     if CORS_ORIGINS == ["*"]:
         logger.warning("CORS is open to all origins (*). This is insecure for production.")
     uvicorn.run("server:app", host="0.0.0.0", port=port, reload=False)
+
