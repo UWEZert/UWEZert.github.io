@@ -540,5 +540,3 @@ class Storage:
                 decision_note=row[12],
                 contest_id=row[13],
             )
-
-# --- Конец файла ---
